@@ -5,7 +5,7 @@ find_package(LATEX)
 if (LATEX_FOUND)
     include(UseLATEX.cmake)
     add_latex_document(
-        reuse.tex
+        amgcl_reuse.tex
         DEPENDS ljm.sty
         )
 endif()

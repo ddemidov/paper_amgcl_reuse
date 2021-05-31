@@ -65,6 +65,21 @@ int main(int argc, char *argv[]) {
          po::bool_switch()->default_value(false),
          "Full rebuild on every iteration. "
         )
+        (
+         "init,i",
+         po::value<int>()->default_value(0),
+         "First input matrix"
+        )
+        (
+         "step,s",
+         po::value<int>()->default_value(1),
+         "Stride over input matrices"
+        )
+        (
+         "renew,n",
+         po::value<int>()->default_value(10),
+         "Renew hierarchy every n steps"
+        )
         ;
 
     po::positional_options_description p;
@@ -86,6 +101,9 @@ int main(int argc, char *argv[]) {
         }
     }
 
+    int init = vm["init"].as<int>();
+    int step = vm["step"].as<int>();
+    int renew = vm["renew"].as<int>();
     bool rebuild = vm["full-rebuild"].as<bool>();
     prm.put("precond.allow_rebuild", !rebuild);
 
@@ -100,7 +118,6 @@ int main(int argc, char *argv[]) {
 
 #if defined(SOLVER_BACKEND_VEXCL)
     vex::Context ctx(vex::Filter::Env);
-    std::cout << ctx << std::endl;
     bprm.q = ctx;
 #endif
 
@@ -122,25 +139,29 @@ int main(int argc, char *argv[]) {
     std::vector<ptrdiff_t> ptr, col;
     std::vector<double> val, rhs;
 
-    for(int time = 0; ; ++time) {
+    for(int time = init, j = 0; ; time += step, ++j) {
         // Read the next system
         try {
             auto t = prof.scoped_tic("reading");
             rows = read_problem(time, ptr, col, val, rhs);
         } catch(...) {
-            std::cout << "done";
             break;
         }
 
         auto A = std::tie(rows, ptr, col, val);
 
         // Rebuild the solver, if necessary
-        if ( rebuild || !solve || solve->size() != rows ) {
-            // Rebuild the solver
-            auto t = prof.scoped_tic("setup");
+        bool full = false;
+        if ( rebuild || !solve || solve->size() != rows || j % renew == 0 ) {
+            full = true;
+            auto t1 = prof.scoped_tic("amgcl");
+            auto t2 = prof.scoped_tic("setup");
+            auto t3 = prof.scoped_tic("full");
             solve = std::make_shared<Solver>(A, prm, bprm);
         } else {
-            auto t = prof.scoped_tic("rebuild");
+            auto t1 = prof.scoped_tic("amgcl");
+            auto t2 = prof.scoped_tic("setup");
+            auto t3 = prof.scoped_tic("partial");
             solve->precond().rebuild(A, bprm);
         }
 
@@ -150,12 +171,13 @@ int main(int argc, char *argv[]) {
 
         // solve the problem:
         {
-            auto t = prof.scoped_tic("solve");
+            auto t1 = prof.scoped_tic("amgcl");
+            auto t2 = prof.scoped_tic("solve");
             std::tie(iters, error) = (*solve)(*f, *x);
         }
 
-        std::cout << time << "\t" << iters << "\t" << error << std::endl;
+        std::cout << time << "\t" << full << "\t" << iters << "\t" << error << std::endl;
     }
 
-    std::cout << prof << std::endl;
+    std::cerr << prof << std::endl;
 }
