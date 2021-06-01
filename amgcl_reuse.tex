@@ -13,6 +13,8 @@ centertags]%
 
 \usepackage{ljm}
 \usepackage{graphicx}
+\usepackage{algorithm}
+\usepackage{algorithmic}
 
 \begin{document}
 
@@ -62,6 +64,51 @@ of non-steady state problems on the example of the open-source AMGCL
 library~\cite{Demidov2019, Demidov2020}.
 
 \section{Partial reuse of AMG hierarchy}
+
+In order to describe the proposed approach to cost reduction in AMG setup
+This section describes the proposed approach to cost reduction in the setup
+phase of the AMG algorithm for non-steady state problems. First, consider the
+basic principles behind the AMG~\cite{brandt1985algebraic, Stuben1999}. The
+method solves a system of linear algebraic equations
+\begin{equation} \label{eq:auf}
+    Au = f,
+\end{equation}
+where $A$ is a square matrix. Mutigrid methods are based on recursive
+application of a two-grid scheme, which combines \emph{relaxation} and
+\emph{coarse grid correction}. Relaxation, or smoothing iteration $S$, is a
+simple iterative method, such as a damped Jacobi or a Gauss--Seidel
+iteration~\cite{barrett1994templates}. Coarse grid correction solves the
+residual equation on a coarser grid, and improves the fine-grid approximation
+with the interpolated coarse-grid solution. Transfer between grids is described
+with \emph{transfer operators} $P$ (\emph{prolongation} or
+\emph{interpolation}) and $R$ (\emph{restriction}).
+
+In geometric multigrid methods the matrices $A_i$ and operators $P_i$ and $R_i$
+are usually supplied by the user based on the problem geometry. In algebraic
+multigrid methods the grid hierarchy and the transfer operators are in general
+constructed automatically, based only on the algebraic properties of the
+matrix~$A$. The \emph{setup} phase of a generic AMG algorithm may be described
+as follows:
+\begin{algorithm}[H]
+\caption{AMG setup}
+\begin{algorithmic}
+    \STATE Start with a system matrix $A_1 \leftarrow A$.
+    \WHILE{the matrix $A_i$ is too big to be solved directly}
+        \STATE Introduce prolongation operator $P_i$ and restriction
+            operator $R_i$.
+        \STATE Construct the coarse system using Galerkin operator: $A_{i+1}
+            \leftarrow R_i A_i P_i$.
+        \STATE Construct the smoother $S_i$.
+    \ENDWHILE
+    \STATE Construct a direct solver for the coarsest system $A_L$.
+\end{algorithmic}
+\end{algorithm}
+
+Note that in order to construct the next level in the AMG hierarchy, one only
+needs to define transfer operators $P$ and $R$. Also, a common choice for the
+restriction operator $R$ is a transpose of the prolongation operator: $R=P^T$.
+In general, the prolongation and restriction operators depend not only on the
+non-zero pattern of the system matrix, but also on its specific values.
 
 \section{Numerical experiments}
 
