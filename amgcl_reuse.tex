@@ -16,21 +16,58 @@ centertags]%
 
 \begin{document}
 
-\title{Accelerating Solution of Non-Steady State Problems with Partial Reuse of AMG Hierarchy}
+\title{Efficient Solution of Non-Steady State Problems with Partial Reuse of
+AMG Hierarchy}
 \author{\firstname{D.E.}~\surname{Demidov}}
 \affiliation{
     Kazan Branch of Joint Supercomputer Center, Scientific Research Institute of System Analysis,
-    the Russian Academy of Sciences}
+    the Russian Academy of Sciences; 2/31, Lobachevskii str., Kazan 420111 Russia}
 
 \begin{abstract}
 Abstract
 \end{abstract}
 
 \subclass{35-04, 65-04, 65Y05, 65Y10, 65Y15, 97N80}
-\keywords{AMG, Non-Steady-State}
+\keywords{AMG, partial reuse, non-steady state.}
 
 \maketitle
 
 \section{Introduction}
+
+Most of the numerical simulation problems today involve solution of large
+sparse linear systems obtained from discretization of partial differential
+equations on either structured or unstructured meshes. The combination of a
+Krylov subspace method with algebraic multigrid (AMG) as a preconditioner is
+considered to be one the most effective choices for solution of such
+systems~\cite{brandt1985algebraic,ruge1987algebraic,Trottenberg2001}. One
+disadvantage of the AMG preconditioner is the high cost of its setup. Depending
+on the convergence rate of the iterative solution, it may take more than 50\%
+of the total compute time. The cost is unavoidable when a steady state problem
+is being solved, but it could be amortized for non-steady state problems either
+by reusing the complete preconditioner on new time steps, or by partial updates
+to the preconditioner using the new system matrix.
+
+Reusing the full preconditioner may work when the system matrix changes slowly
+over the time. In this case there is a strong chance that a preconditioner
+constructed for a specific time step will act as a reasonably good
+preconditioner for a couple of subsequent time steps. However, the deteriorated
+quality of the preconditioner may result in a convergence rate that is bad
+enough to neglect any time savings obtained by reusing the preconditioner. It
+was shown in~\cite{Demidov2012} that this strategy may only be beneficial when
+the solution phase is comparable to or is cheaper than the setup phase (for
+example, when the solution phase is accelerated by using a GPU).
+
+This paper considers the effects of partial reuse of AMG strategy for solution
+of non-steady state problems on the example of the open-source AMGCL
+library~\cite{Demidov2019, Demidov2020}.
+
+\section{Partial reuse of AMG hierarchy}
+
+\section{Numerical experiments}
+
+\section{Conclusion}
+
+\bibliographystyle{plain}
+\bibliography{ref}	
 
 \end{document}
