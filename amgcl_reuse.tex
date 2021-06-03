@@ -16,6 +16,9 @@ centertags]%
 \usepackage{algorithm}
 \usepackage{algorithmic}
 \usepackage{cleveref}
+\usepackage{tabularx}
+
+\newcolumntype{Y}{>{\raggedleft\arraybackslash}X}
 
 \begin{document}
 
@@ -125,6 +128,45 @@ non-zero pattern of the system matrix, but also on its specific values.
         Direct solver for the coarsest system     &  1\% &  4\% \\
     \end{tabular}
 \end{table}
+
+\begin{table}
+    \caption{Cost savings for different reuse strategies}
+    \centering
+    \begin{tabularx}{\textwidth}{l|YYYYYY}
+        Strategy & Setup (s) & Solve (s) & Rebuilds & Iterations & Total \newline speedup (\%) & Setup \newline speedup (\%) \\ 
+        \hline
+        & \multicolumn{6}{c}{Convection, OpenMP} \\
+        No reuse      & 1.145 & 2.780 & 49 & 5.0 &      &         \\
+        Full reuse    & 0.026 & 3.186 & 1  & 5.5 & 22\% & 4~303\% \\
+        Partial reuse & 0.703 & 2.769 & 5  & 5.0 & 13\% & 63\%    \\
+        \hline
+        & \multicolumn{6}{c}{Convection, CUDA} \\
+        No reuse      & 1.890 & 0.781 & 49 & 5.0 &       &         \\
+        Full reuse    & 0.039 & 0.897 & 1  & 5.5 & 185\% & 4~746\% \\
+        Partial reuse & 1.284 & 0.781 & 5  & 5.0 & 29\%  & 47\%    \\
+        \hline
+        & \multicolumn{6}{c}{Redistancing, OpenMP} \\
+        No reuse      & 1.246 & 9.508  & 49 & 15.7 &      &       \\
+        Full reuse    & 0.245 & 11.324 & 9  & 18.1 & -7\% & 408\% \\
+        Partial reuse & 0.749 & 9.308  & 5  & 15.6 & 7\%  & 66\%  \\
+        \hline
+        & \multicolumn{6}{c}{Redistancing, CUDA} \\
+        No reuse      & 1.904 & 2.636 & 49 & 15.7 &      &       \\
+        Full reuse    & 0.355 & 3.049 & 9  & 18.0 & 33\% & 436\% \\
+        Partial reuse & 1.340 & 2.613 & 5  & 15.6 & 15\% & 42\%  \\
+        \hline
+        & \multicolumn{6}{c}{Navier-Stokes, OpenMP} \\
+        No reuse      & 9.735 & 66.693  & 49 & 15.4 &       &       \\
+        Full reuse    & 4.863 & 247.403 & 25 & 46.1 & -70\% & 100\% \\
+        Partial reuse & 7.892 & 68.101  & 5  & 15.6 & 1\%   & 23\%  \\
+        \hline
+        & \multicolumn{6}{c}{Navier-Stokes, CUDA} \\
+        No reuse      & 15.417 & 20.367 & 49 & 15.4 &       &      \\
+        Full reuse    & 7.751  & 60.638 & 25 & 45.9 & -48\% & 99\% \\
+        Partial reuse & 13.056 & 20.498 & 5  & 15.6 & 7\%   & 18\% \\
+    \end{tabularx}
+\end{table}
+
 \section{Conclusion}
 
 \bibliographystyle{spmpsci}
