@@ -7,7 +7,7 @@ if (LATEX_FOUND)
     add_latex_document(
         amgcl_reuse.tex
         BIBFILES ref.bib
-        DEPENDS ljm.sty
+        DEPENDS ljm.sty spmpsci.bst
         )
 endif()
 
