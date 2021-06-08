@@ -46,25 +46,40 @@ Krylov subspace method with algebraic multigrid (AMG) as a preconditioner is
 considered to be one the most effective choices for solution of such
 systems~\cite{brandt1985algebraic,ruge1987algebraic,Trottenberg2001}. One
 disadvantage of the AMG preconditioner is the high cost of its setup. Depending
-on the convergence rate of the iterative solution, it may take more than 50\%
-of the total compute time. The cost is unavoidable when a steady state problem
-is being solved, but it could be amortized for non-steady state problems either
-by reusing the complete preconditioner on new time steps, or by partial updates
-to the preconditioner using the new system matrix.
+on the convergence rate of the iterative solution, the setup may take more than
+50\% of the total compute time. This cost is unavoidable when a steady state
+problem is being solved, but it could be amortized for non-steady state
+problems either by reusing the complete preconditioner on new time steps, or by
+partial updates to the preconditioner using the new system matrix.
 
-Reusing the full preconditioner may work when the system matrix changes slowly
-over the time. In this case there is a strong chance that a preconditioner
-constructed for a specific time step will act as a reasonably good
-preconditioner for a couple of subsequent time steps. However, the deteriorated
-quality of the preconditioner may result in a convergence rate that is bad
-enough to neglect any time savings obtained by reusing the preconditioner. It
-was shown in~\cite{Demidov2012} that this strategy may only be beneficial when
-the solution phase is comparable to or is cheaper than the setup phase (for
-example, when the solution phase is accelerated by using a GPU).
+In this paper two possible strategies of amortizing the cost of the AMG setup
+are considered. The first one is the \emph{full reuse} strategy, described
+in~\cite{Demidov2012}, where the AMG preconditioner is used completely
+unaltered for as long as the solution is able to converge in a reasonable
+number of iterations.  Reusing the preconditioner this way may work when the
+system matrix changes slowly over the time. In this case there is a strong
+chance that a preconditioner constructed for a specific time step will act as a
+reasonably good preconditioner for a couple of subsequent time steps. However,
+the applicability of the preconditioner may deteriorate with time and may
+result in a convergence rate that is bad enough to neglect any time savings due
+to reusing the preconditioner. It was shown in~\cite{Demidov2012} that this
+strategy is mostly beneficial when the solution phase is comparable to or is
+cheaper than the setup phase. This may be the case when the solution phase is
+accelerated by using a GPU, or when just a couple of iterations are required
+for the solution to converge.
 
-This paper considers the effects of partial reuse of AMG strategy for solution
-of non-steady state problems on the example of the open-source AMGCL
-library~\cite{Demidov2019, Demidov2020}.
+The second approach considered here is the \emph{partial reuse} strategy, which
+was recently implemented in the opensource AMGCL library~\cite{Demidov2019,
+Demidov2020}. Here, the AMG hierarchy is partially updated on each of the time
+steps. Namely, the transfer operators (restriction and interpolation) are
+reused for a number of time steps, while the system matrices and the smoother
+operators on each level of the hierarchy are updated on every step.  It is
+shown that the partial reuse strategy is able to consistently reduce both the
+setup cost and the overall compute time, while the full reuse strategy may be
+either more efficient or counterproductive, depending on the problem that is
+being solved.
+
+The rest of the paper is structured as follows: \ldots
 
 \section{Reusing of AMG hierarchy}
 
