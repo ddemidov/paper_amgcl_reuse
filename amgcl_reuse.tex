@@ -22,9 +22,8 @@ centertags]%
 
 \begin{document}
 
-\title{Efficient Solution of Non-Steady State Problems with Partial Reuse of
-AMG Hierarchy}
-\author{\firstname{D.E.}~\surname{Demidov}}
+\title{Reusing AMG Hierarchy for Solution of Non-Steady State Problems}
+\author{\firstname{D.~E.}~\surname{Demidov}}
 \affiliation{
     Kazan Branch of Joint Supercomputer Center, Scientific Research Institute of System Analysis,
     the Russian Academy of Sciences; 2/31, Lobachevskii str., Kazan 420111 Russia}
@@ -67,7 +66,7 @@ This paper considers the effects of partial reuse of AMG strategy for solution
 of non-steady state problems on the example of the open-source AMGCL
 library~\cite{Demidov2019, Demidov2020}.
 
-\section{Partial reuse of AMG hierarchy}
+\section{Reusing of AMG hierarchy}
 
 In order to describe the proposed approach to cost reduction in AMG setup
 This section describes the proposed approach to cost reduction in the setup
@@ -91,28 +90,61 @@ In geometric multigrid methods the matrices $A_i$ and operators $P_i$ and $R_i$
 are usually supplied by the user based on the problem geometry. In algebraic
 multigrid methods the grid hierarchy and the transfer operators are in general
 constructed automatically, based only on the algebraic properties of the
-matrix~$A$. The \emph{setup} phase of a generic AMG algorithm may be described
-as follows:
-\begin{algorithm}[H]
-\caption{AMG setup}
-\begin{algorithmic} \label{alg:setup}
-    \STATE Start with a system matrix $A_1 \leftarrow A$.
-    \WHILE{the matrix $A_i$ is too big to be solved directly}
-        \STATE Introduce prolongation operator $P_i$ and restriction
-            operator $R_i$.
-        \STATE Construct the coarse system using Galerkin operator: $A_{i+1}
-            \leftarrow R_i A_i P_i$.
-        \STATE Construct the smoother $S_i$.
-    \ENDWHILE
-    \STATE Construct a direct solver for the coarsest system $A_L$.
-\end{algorithmic}
+matrix~$A$. \Cref{alg:setup} describes the \emph{setup} phase of a generic AMG
+method.
+
+\begin{algorithm}
+    \caption{AMG setup}
+    \begin{algorithmic}[1] \label{alg:setup}
+        \STATE Start with a system matrix $A_1 \leftarrow A$.
+        \WHILE{the matrix $A_i$ is too big to be solved directly}
+            \STATE Introduce prolongation operator $P_i$ and restriction
+                operator $R_i$.
+            \STATE Construct the coarse system using Galerkin operator: $A_{i+1}
+                \leftarrow R_i A_i P_i$.
+            \STATE Construct the smoother $S_i$.
+        \ENDWHILE
+        \STATE Construct a direct solver for the coarsest system $A_L$.
+    \end{algorithmic}
+\end{algorithm}
+
+\begin{algorithm}
+    \caption{Full rebuild of the AMG hierarchy}
+    \begin{algorithmic}[1]
+        \FOR{all time steps}
+            \IF{AMG hierarchy has to be rebuilt}
+                \STATE Rebuild AMG hierarchy using the current system matrix
+            \ENDIF
+            \STATE Solve the current system using the latest AMG hierarchy
+        \ENDFOR
+    \end{algorithmic}
+\end{algorithm}
+
+\begin{algorithm}
+    \caption{Partial rebuild of the AMG hierarchy}
+    \begin{algorithmic}[1]
+        \FOR{all time steps}
+            \IF{AMG hierarchy has to be rebuilt}
+                \STATE Rebuild AMG hierarchy using the current system matrix
+            \ELSE
+                \STATE \emph{Update the latest AMG hierarchy:}
+                \FOR{all levels $i$}
+                    \STATE $A_{i+1} \leftarrow R_i A_i P_i$
+                    \STATE $S_{i} \leftarrow S(A_i)$
+                \ENDFOR
+                \STATE Construct a direct solver for the coarsest system $A_L$.
+            \ENDIF
+            \STATE Solve the current system using the latest AMG hierarchy
+        \ENDFOR
+    \end{algorithmic}
 \end{algorithm}
 
 Note that in order to construct the next level in the AMG hierarchy, one only
-needs to define transfer operators $P$ and $R$. Also, a common choice for the
-restriction operator $R$ is a transpose of the prolongation operator: $R=P^T$.
-In general, the prolongation and restriction operators depend not only on the
-non-zero pattern of the system matrix, but also on its specific values.
+needs to define transfer operators $P$ and $R$. A common choice for the
+restriction operator $R$ is the transpose of the prolongation operator:
+$R=P^T$.  In general, the prolongation and restriction operators depend not
+only on the non-zero pattern of the system matrix, but also on its specific
+values.
 
 \section{Numerical experiments}
 
@@ -122,10 +154,10 @@ non-zero pattern of the system matrix, but also on its specific values.
     \begin{tabular}{l|rr}
         Step & Small system & Large system \\
         \hline
-        Transfer operators $P_i$ and $R_i$        & 48\% & 18\% \\
-        Galerkin operator $A_{i+1} = R_i A_i P_i$ & 29\% & 22\% \\
-        Smoother $S_i$                            &  3\% & 18\% \\
-        Direct solver for the coarsest system     &  1\% &  4\% \\
+        Transfer operators $P_i$ and $R_i$        & 48\% & 21\% \\
+        Galerkin operator $A_{i+1} = R_i A_i P_i$ & 29\% & 24\% \\
+        Smoother $S_i$                            &  3\% &  4\% \\
+        Direct solver for the coarsest system     &  1\% &  0\% \\
     \end{tabular}
 \end{table}
 
@@ -133,7 +165,9 @@ non-zero pattern of the system matrix, but also on its specific values.
     \caption{Cost savings for different reuse strategies}
     \centering
     \begin{tabularx}{\textwidth}{l|YYYYYY}
-        Strategy & Setup (s) & Solve (s) & Rebuilds & Iterations & Total \newline speedup (\%) & Setup \newline speedup (\%) \\ 
+        Strategy & Setup (s) & Solve (s) & Rebuilds
+        & Average iterations & Total \newline speedup (\%)
+        & Setup \newline speedup (\%) \\
         \hline
         & \multicolumn{6}{c}{Convection, OpenMP} \\
         No reuse      & 1.145 & 2.780 & 49 & 5.0 &      &         \\
@@ -156,20 +190,20 @@ non-zero pattern of the system matrix, but also on its specific values.
         Partial reuse & 1.340 & 2.613 & 5  & 15.6 & 15\% & 42\%  \\
         \hline
         & \multicolumn{6}{c}{Navier-Stokes, OpenMP} \\
-        No reuse      & 9.735 & 66.693  & 49 & 15.4 &       &       \\
-        Full reuse    & 4.863 & 247.403 & 25 & 46.1 & -70\% & 100\% \\
-        Partial reuse & 7.892 & 68.101  & 5  & 15.6 & 1\%   & 23\%  \\
+        No reuse      & 7.926 &  71.052 & 49 & 16.7 &       &       \\
+        Full reuse    & 3.859 & 239.322 & 25 & 45.6 & -68\% & 105\% \\
+        Partial reuse & 6.011 &  71.763 &  5 & 16.9 &   2\% &  32\% \\
         \hline
         & \multicolumn{6}{c}{Navier-Stokes, CUDA} \\
-        No reuse      & 15.417 & 20.367 & 49 & 15.4 &       &      \\
-        Full reuse    & 7.751  & 60.638 & 25 & 45.9 & -48\% & 99\% \\
-        Partial reuse & 13.056 & 20.498 & 5  & 15.6 & 7\%   & 18\% \\
+        No reuse      & 13.789 & 21.398 & 49 & 16.7 &       &       \\
+        Full reuse    &  6.863 & 59.200 & 25 & 46.1 & -47\% & 101\% \\
+        Partial reuse & 11.209 & 21.597 &  5 & 16.9 &   7\% &  23\% \\
     \end{tabularx}
 \end{table}
 
 \section{Conclusion}
 
 \bibliographystyle{spmpsci}
-\bibliography{ref}	
+\bibliography{ref}
 
 \end{document}
