@@ -107,8 +107,8 @@ described with the \emph{transfer operators} $P$ (\emph{prolongation} or
 \emph{interpolation}) and $R$ (\emph{restriction}).
 
 \begin{algorithm}
-    \caption{AMG setup}
-    \begin{algorithmic}[1] \label{alg:setup}
+    \caption{AMG setup.}
+    \begin{algorithmic} \label{alg:setup}
         \STATE Start with a system matrix $A_1 \leftarrow A$.
         \WHILE{the matrix $A_i$ is too big to be solved directly}
             \STATE Construct the transfer operators $P_i$ and $R_i$.
@@ -134,8 +134,8 @@ The most time consuming steps of the setup are the transfer operators
 construction and the evaluation of the Galerkin operator.
 
 \begin{algorithm}
-    \caption{AMG V-cycle}
-    \begin{algorithmic}[1] \label{alg:vcycle}
+    \caption{AMG V-cycle.}
+    \begin{algorithmic} \label{alg:vcycle}
         \STATE Start at the finest level with an initial approximation
         $u_1 \leftarrow u^0$.
         \WHILE{not converged}
@@ -170,8 +170,8 @@ Here the AMG setup cost amortization strategies considered in
 the paper are described. 
 
 \begin{algorithm}
-    \caption{Full rebuild of the AMG hierarchy}
-    \begin{algorithmic}[1]
+    \caption{Full rebuild of the AMG hierarchy.}
+    \begin{algorithmic}
         \FOR{all time steps}
             \IF{AMG hierarchy has to be rebuilt}
                 \STATE Rebuild AMG hierarchy using the current system matrix
@@ -182,8 +182,8 @@ the paper are described.
 \end{algorithm}
 
 \begin{algorithm}
-    \caption{Partial rebuild of the AMG hierarchy}
-    \begin{algorithmic}[1]
+    \caption{Partial rebuild of the AMG hierarchy.}
+    \begin{algorithmic}
         \FOR{all time steps}
             \IF{AMG hierarchy has to be rebuilt}
                 \STATE Rebuild AMG hierarchy using the current system matrix
@@ -224,8 +224,8 @@ domain $\Omega$ can be described by the incompressible
 two-fluid Navier-Stokes equations:
 \begin{gather}
     \rho \left[ \frac{\partial \mathbf u}{\partial t} + (\mathbf u \cdot \nabla)
-    \mathbf u \right] - \nabla \cdot \left[ 2 \mu \mathbf \varepsilon(\mathbf u) \right]
-    + \nabla p = \mathbf f, \\
+    \mathbf u \right] - \nabla \cdot \left[ 2 \mu \mathbf \varepsilon(\mathbf
+    u) \right] + \nabla p = \mathbf f, \\
     \nabla \cdot \mathbf u = 0,
 \end{gather}
 where $\rho$ is the density, $\mathbf u$ is the velocity field, $\mu$ is the
@@ -247,25 +247,29 @@ using the so-called level set method, which has been widely used to track free
 surfaces in mould filling and other metal forming processes. The basic idea of
 the level set method is to define a smooth scalar function $\psi(x, t)$, over
 the computational domain $\Omega$ that determines the extent of subdomains
-$\Omega_1$ and $\Omega_2$. For instance,
-positive values may be assigned to the points belonging to $\Omega_1$, and
-negative values~--- to the points belonging to $\Omega_2$. The position of the
-fluid front will be defined by the iso-value contour $\psi(x, t) = 0$.
-The evolution of the front $\psi = 0$ in any control volume $V_t \subset
-\Omega$ that is moving with a divergence-free velocity field $\mathbf u$ leads to
+$\Omega_1$ and $\Omega_2$. For instance, positive values may be assigned to the
+points belonging to $\Omega_1$, and negative values~--- to the points belonging
+to $\Omega_2$. The position of the fluid front will be defined by the iso-value
+contour $\psi(x, t) = 0$.  The evolution of the front $\psi = 0$ in any control
+volume $V_t \subset \Omega$ that is moving with a divergence-free velocity
+field $\mathbf u$ leads to
 \begin{equation}
     \frac{\partial \psi}{\partial t} + (\mathbf u \cdot \nabla) \psi = 0.
 \end{equation}
 
-Both the Navier–Stokes and the level set equations are solved using a finite
+Both the Navier-Stokes and the level set equations are solved using a finite
 element model based on a stabilized finite element method, using linear P1
-elements for all the unknowns. The level set equation has 104~401 unknowns and
-1~331~279 non-zero elements in the system matrix. In this work, the two sets of the equations are
-treated as independent non-steady state problems in order to test the
-efficiency of the considered AMG setup cost amortization strategies.
+elements for all the unknowns. The level set equation has 104,401 unknowns and
+1,331,279 non-zero elements in the system matrix. The Navier-Stokes equation
+has 417,604 unknowns and 21,300,464 non-zero elements in the system matrix.
+In total, 50 time steps are made in the model example.  The level set equations
+and the Navier-Stokes equations on each of the time steps are treated as
+independent non-steady state problems in order to test the efficiency of the
+AMG setup cost amortization strategies considered here.
 
 \begin{table}
-    \caption{Relative cost of the setup operations from \Cref{alg:setup}}
+    \caption{Relative cost of the setup operations from \Cref{alg:setup}.}
+    \label{tab:setup}
     \centering
     \begin{tabularx}{0.8\textwidth}{l|YY}
         Step & Level set & Navier-Stokes \\
@@ -277,8 +281,15 @@ efficiency of the considered AMG setup cost amortization strategies.
     \end{tabularx}
 \end{table}
 
+\Cref{tab:setup} shows cost of each of the steps from \Cref{alg:setup} for the
+level set and Navier-Stokes problems relative to the complete setup time. The
+data shows that the construction of the transfer operators takes significant
+portion of the setup. The partial reuse strategy basically removes this step
+from the setup, which allows to save 20 to 60\% of the setup cost.
+
 \begin{table}
-    \caption{Cost savings for different reuse strategies}
+    \caption{Cost savings for the full and partial reuse strategies.}
+    \label{tab:strategies}
     \centering
     \begin{tabularx}{\textwidth}{l|YYYYYY}
         Strategy & Setup (s) & Solve (s) & Rebuilds
@@ -287,12 +298,12 @@ efficiency of the considered AMG setup cost amortization strategies.
         \hline
         & \multicolumn{6}{c}{Level set, OpenMP} \\
         No reuse      & 1.145 & 2.780 & 49 & 5.0 &      &         \\
-        Full reuse    & 0.026 & 3.186 & 1  & 5.5 & 22\% & 4~303\% \\
+        Full reuse    & 0.026 & 3.186 & 1  & 5.5 & 22\% & 4,303\% \\
         Partial reuse & 0.703 & 2.769 & 5  & 5.0 & 13\% & 63\%    \\
         \hline
         & \multicolumn{6}{c}{Level set, CUDA} \\
         No reuse      & 1.890 & 0.781 & 49 & 5.0 &       &         \\
-        Full reuse    & 0.039 & 0.897 & 1  & 5.5 & 185\% & 4~746\% \\
+        Full reuse    & 0.039 & 0.897 & 1  & 5.5 & 185\% & 4,746\% \\
         Partial reuse & 1.284 & 0.781 & 5  & 5.0 & 29\%  & 47\%    \\
         %\hline
         %& \multicolumn{6}{c}{Redistancing, OpenMP} \\
