@@ -29,7 +29,13 @@ centertags]%
     the Russian Academy of Sciences; 2/31, Lobachevskii str., Kazan 420111 Russia}
 
 \begin{abstract}
-Abstract
+    The work considers the full reuse and the partial reuse strategies for the
+    algebraic multigrid (AMG) setup cost amortization for the case of a
+    non-steady state problem solution. It is shown on the model example of a
+    dam break fluid dynamics problem that the partial reuse strategy is able to
+    consistently reduce the cost of the AMG setup across multiple time steps.
+    The strategy may save up to 50\% of the setup time and, depending on the
+    relative cost of the setup, up to 20\% of the total compute time.
 \end{abstract}
 
 \subclass{35-04, 65-04, 65Y05, 65Y10, 65Y15, 97N80}
@@ -81,47 +87,81 @@ being solved.
 
 The rest of the paper is structured as follows: \ldots
 
-\section{Reusing of AMG hierarchy}
+\section{Algebraic multigrid}
 
-In order to describe the proposed approach to cost reduction in AMG setup
-This section describes the proposed approach to cost reduction in the setup
-phase of the AMG algorithm for non-steady state problems. First, consider the
-basic principles behind the AMG~\cite{brandt1985algebraic, Stuben1999}. The
-method solves a system of linear algebraic equations
-\begin{equation} \label{eq:auf}
-    Au = f,
-\end{equation}
-where $A$ is a square matrix. Mutigrid methods are based on recursive
-application of a two-grid scheme, which combines \emph{relaxation} and
-\emph{coarse grid correction}. Relaxation, or smoothing iteration $S$, is a
+This section describes the basic principles behind the
+AMG~\cite{brandt1985algebraic, Stuben1999}.  The method solves a system of
+linear algebraic equations \begin{equation} \label{eq:auf} Au = f,
+\end{equation} where $A$ is a square matrix. Mutigrid methods are based on
+recursive application of a two-grid scheme, which combines \emph{relaxation}
+and \emph{coarse grid correction}. Relaxation, or smoothing iteration $S$, is a
 simple iterative method, such as a damped Jacobi or a Gauss--Seidel
 iteration~\cite{barrett1994templates}. Coarse grid correction solves the
 residual equation on a coarser grid, and improves the fine-grid approximation
-with the interpolated coarse-grid solution. Transfer between grids is described
-with \emph{transfer operators} $P$ (\emph{prolongation} or
+with the interpolated coarse-grid solution. Transfer between the grids is
+described with the \emph{transfer operators} $P$ (\emph{prolongation} or
 \emph{interpolation}) and $R$ (\emph{restriction}).
-
-In geometric multigrid methods the matrices $A_i$ and operators $P_i$ and $R_i$
-are usually supplied by the user based on the problem geometry. In algebraic
-multigrid methods the grid hierarchy and the transfer operators are in general
-constructed automatically, based only on the algebraic properties of the
-matrix~$A$. \Cref{alg:setup} describes the \emph{setup} phase of a generic AMG
-method.
 
 \begin{algorithm}
     \caption{AMG setup}
     \begin{algorithmic}[1] \label{alg:setup}
         \STATE Start with a system matrix $A_1 \leftarrow A$.
         \WHILE{the matrix $A_i$ is too big to be solved directly}
-            \STATE Introduce prolongation operator $P_i$ and restriction
-                operator $R_i$.
-            \STATE Construct the coarse system using Galerkin operator: $A_{i+1}
-                \leftarrow R_i A_i P_i$.
+            \STATE Construct the transfer operators $P_i$ and $R_i$.
             \STATE Construct the smoother $S_i$.
+            \STATE Construct the coarser system using Galerkin operator: $A_{i+1}
+                \leftarrow R_i A_i P_i$.
         \ENDWHILE
         \STATE Construct a direct solver for the coarsest system $A_L$.
     \end{algorithmic}
 \end{algorithm}
+
+In geometric multigrid methods the matrices $A_i$ and operators $P_i$ and $R_i$
+are usually supplied by the user based on the problem geometry. In algebraic
+multigrid methods the grid hierarchy and the transfer operators are in general
+constructed automatically, based only on the algebraic properties of the
+matrix~$A$. \Cref{alg:setup} describes the \emph{setup} phase of a generic AMG
+method. Here, the transfer operators $P_i$ and $R_i$, as well as the smoother
+$S_i$ are constructed from the system matrix $A_i$ on each level of the AMG
+grid hierarchy (a common choice for the restriction operator $R$ is the
+transpose of the prolongation operator $R=P^T$). Note that the next level in
+the AMG hierarchy is fully defined by the transfer operators $P_i$ and $R_i$.
+
+\begin{algorithm}
+    \caption{AMG V-cycle}
+    \begin{algorithmic}[1] \label{alg:vcycle}
+        \STATE Start at the finest level with an initial approximation
+        $u_1 \leftarrow u^0$.
+        \WHILE{not converged}
+            \FOR{each level of the hierarchy, finest-to-coarsest}
+                \STATE Apply a couple of smoothing iterations to the current
+                       solution: $u_i \leftarrow S_i(f_i, u_i)$.
+                \STATE Find residual $e_i \leftarrow f_i - A_i u_i$ and
+                       restrict it to the RHS on the coarser level:
+                       $f_{i+1} \leftarrow R_i e_i$.
+            \ENDFOR
+            \STATE Solve the coarsest system directly:
+                   $u_L \leftarrow A_L^{-1} f_L$.
+            \FOR{each level of the hierarchy, coarsest-to-finest}
+                \STATE Update the current solution with the interpolated
+                       solution from the coarser level:
+                       $u_i \leftarrow u_i + P_i u_{i+1}$.
+                \STATE Apply a couple of smoothing iterations to the current
+                       solution: $u_i \leftarrow S_i(f_i, u_i)$.
+            \ENDFOR
+        \ENDWHILE
+    \end{algorithmic}
+\end{algorithm}
+
+After the AMG hierarchy has been constructed, it may be used to solve the
+system using a simple V-cycle shown in \Cref{alg:vcycle}. Usually AMG is not
+used standalone, but as a preconditioner with an iterative Krylov subspace
+method. In this case a single V-cycle is used as a preconditioning step.
+
+\section{AMG reuse strategies}
+
+Here the AMG setup cost amortization strategies considered in
+the paper are described. 
 
 \begin{algorithm}
     \caption{Full rebuild of the AMG hierarchy}
@@ -154,26 +194,19 @@ method.
     \end{algorithmic}
 \end{algorithm}
 
-Note that in order to construct the next level in the AMG hierarchy, one only
-needs to define transfer operators $P$ and $R$. A common choice for the
-restriction operator $R$ is the transpose of the prolongation operator:
-$R=P^T$.  In general, the prolongation and restriction operators depend not
-only on the non-zero pattern of the system matrix, but also on its specific
-values.
-
 \section{Numerical experiments}
 
 \begin{table}
     \caption{Relative cost of the setup operations from \Cref{alg:setup}}
     \centering
-    \begin{tabular}{l|rr}
-        Step & Small system & Large system \\
+    \begin{tabularx}{0.8\textwidth}{l|YY}
+        Step & Convection & Navier-Stokes \\
         \hline
         Transfer operators $P_i$ and $R_i$        & 48\% & 21\% \\
         Galerkin operator $A_{i+1} = R_i A_i P_i$ & 29\% & 24\% \\
         Smoother $S_i$                            &  3\% &  4\% \\
         Direct solver for the coarsest system     &  1\% &  0\% \\
-    \end{tabular}
+    \end{tabularx}
 \end{table}
 
 \begin{table}
