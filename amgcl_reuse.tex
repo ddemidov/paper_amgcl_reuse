@@ -85,9 +85,13 @@ setup cost and the overall compute time, while the full reuse strategy may be
 either more efficient or counterproductive, depending on the problem that is
 being solved.
 
-The rest of the paper is structured as follows: \ldots
+The rest of the paper is structured as follows. \Cref{sec:amg} provides an
+overview of the AMG method. \Cref{sec:strategies} describes the AMG setup cost
+amortization strategies considered in the paper. \Cref{sec:experiments}
+describes the numerical experiments used to test the efficiency of the
+amortization strategies, and presents the results of the numerical experiments.
 
-\section{Algebraic multigrid}
+\section{Algebraic multigrid} \label{sec:amg}
 
 This section describes the basic principles behind the
 AMG~\cite{brandt1985algebraic, Stuben1999}.  The method solves a system of
@@ -126,6 +130,8 @@ $S_i$ are constructed from the system matrix $A_i$ on each level of the AMG
 grid hierarchy (a common choice for the restriction operator $R$ is the
 transpose of the prolongation operator $R=P^T$). Note that the next level in
 the AMG hierarchy is fully defined by the transfer operators $P_i$ and $R_i$.
+The most time consuming steps of the setup are the transfer operators
+construction and the evaluation of the Galerkin operator.
 
 \begin{algorithm}
     \caption{AMG V-cycle}
@@ -158,7 +164,7 @@ system using a simple V-cycle shown in \Cref{alg:vcycle}. Usually AMG is not
 used standalone, but as a preconditioner with an iterative Krylov subspace
 method. In this case a single V-cycle is used as a preconditioning step.
 
-\section{AMG reuse strategies}
+\section{AMG reuse strategies} \label{sec:strategies}
 
 Here the AMG setup cost amortization strategies considered in
 the paper are described. 
@@ -194,13 +200,75 @@ the paper are described.
     \end{algorithmic}
 \end{algorithm}
 
-\section{Numerical experiments}
+\section{Numerical experiments} \label{sec:experiments}
+
+In order to test the cost amortization strategies described in the above
+section, a model two-fluid dam break scenario was modelled using the Kratos
+Multi-Phisics framework~\cite{Dadvand2010,Dadvand2013}. The source code for the
+example is available in~\cite{dambreak}. In the scenario, a water-filled cuboid
+is positioned in one part of the domain. It is released at the start time and
+the water spreads across the domain driven by gravity. The water hits an
+obstacle and splashes develop. More details on the boundary conditions and
+problem settings can be found in~\cite{Larese2008, Coppola2011}. There are
+two basic substeps needed to evolve the solution from time step $n$ to time
+step $n+1$:
+\begin{enumerate}
+    \item Find the motion in both phases as the solution of the two-fluid
+        Navier-Stokes equations;
+    \item Determine the position of the interface by solving a convection
+        equation for the level-set function.
+\end{enumerate}
+
+The velocity and pressure fields of two incompressible fluids moving in the
+domain $\Omega$ can be described by the incompressible
+two-fluid Navier-Stokes equations:
+\begin{gather}
+    \rho \left[ \frac{\partial \mathbf u}{\partial t} + (\mathbf u \cdot \nabla)
+    \mathbf u \right] - \nabla \cdot \left[ 2 \mu \mathbf \varepsilon(\mathbf u) \right]
+    + \nabla p = \mathbf f, \\
+    \nabla \cdot \mathbf u = 0,
+\end{gather}
+where $\rho$ is the density, $\mathbf u$ is the velocity field, $\mu$ is the
+dynamic viscosity, $p$ is the pressure, $\mathbf \varepsilon(\cdot)$ is the
+symmetric gradient operator, and $\mathbf f$ is the external body force vector,
+which includes the gravity and bouyancy forces, if required. The density,
+velocity, dynamic viscosity, and pressure are defined as
+\begin{equation}
+    \mathbf u, p, \rho, \mu = \begin{cases}
+        \mathbf u_1, p_1, \rho_1, \mu_1 \quad \mathbf x \in \Omega_1, \\
+        \mathbf u_2, p_2, \rho_2, \mu_2 \quad \mathbf x \in \Omega_2,
+    \end{cases}
+\end{equation}
+where $\Omega_1$ and $\Omega_2$ indicate the parts of $\Omega$ occupied by
+fluids number 1 and 2 correspondingly.
+
+Regarding the second step, the evolution of the fluid interface is updated
+using the so-called level set method, which has been widely used to track free
+surfaces in mould filling and other metal forming processes. The basic idea of
+the level set method is to define a smooth scalar function $\psi(x, t)$, over
+the computational domain $\Omega$ that determines the extent of subdomains
+$\Omega_1$ and $\Omega_2$. For instance,
+positive values may be assigned to the points belonging to $\Omega_1$, and
+negative values~--- to the points belonging to $\Omega_2$. The position of the
+fluid front will be defined by the iso-value contour $\psi(x, t) = 0$.
+The evolution of the front $\psi = 0$ in any control volume $V_t \subset
+\Omega$ that is moving with a divergence-free velocity field $\mathbf u$ leads to
+\begin{equation}
+    \frac{\partial \psi}{\partial t} + (\mathbf u \cdot \nabla) \psi = 0.
+\end{equation}
+
+Both the Navier–Stokes and the level set equations are solved using a finite
+element model based on a stabilized finite element method, using linear P1
+elements for all the unknowns. The level set equation has 104~401 unknowns and
+1~331~279 non-zero elements in the system matrix. In this work, the two sets of the equations are
+treated as independent non-steady state problems in order to test the
+efficiency of the considered AMG setup cost amortization strategies.
 
 \begin{table}
     \caption{Relative cost of the setup operations from \Cref{alg:setup}}
     \centering
     \begin{tabularx}{0.8\textwidth}{l|YY}
-        Step & Convection & Navier-Stokes \\
+        Step & Level set & Navier-Stokes \\
         \hline
         Transfer operators $P_i$ and $R_i$        & 48\% & 21\% \\
         Galerkin operator $A_{i+1} = R_i A_i P_i$ & 29\% & 24\% \\
@@ -217,25 +285,25 @@ the paper are described.
         & Average iterations & Total \newline speedup (\%)
         & Setup \newline speedup (\%) \\
         \hline
-        & \multicolumn{6}{c}{Convection, OpenMP} \\
+        & \multicolumn{6}{c}{Level set, OpenMP} \\
         No reuse      & 1.145 & 2.780 & 49 & 5.0 &      &         \\
         Full reuse    & 0.026 & 3.186 & 1  & 5.5 & 22\% & 4~303\% \\
         Partial reuse & 0.703 & 2.769 & 5  & 5.0 & 13\% & 63\%    \\
         \hline
-        & \multicolumn{6}{c}{Convection, CUDA} \\
+        & \multicolumn{6}{c}{Level set, CUDA} \\
         No reuse      & 1.890 & 0.781 & 49 & 5.0 &       &         \\
         Full reuse    & 0.039 & 0.897 & 1  & 5.5 & 185\% & 4~746\% \\
         Partial reuse & 1.284 & 0.781 & 5  & 5.0 & 29\%  & 47\%    \\
-        \hline
-        & \multicolumn{6}{c}{Redistancing, OpenMP} \\
-        No reuse      & 1.246 & 9.508  & 49 & 15.7 &      &       \\
-        Full reuse    & 0.245 & 11.324 & 9  & 18.1 & -7\% & 408\% \\
-        Partial reuse & 0.749 & 9.308  & 5  & 15.6 & 7\%  & 66\%  \\
-        \hline
-        & \multicolumn{6}{c}{Redistancing, CUDA} \\
-        No reuse      & 1.904 & 2.636 & 49 & 15.7 &      &       \\
-        Full reuse    & 0.355 & 3.049 & 9  & 18.0 & 33\% & 436\% \\
-        Partial reuse & 1.340 & 2.613 & 5  & 15.6 & 15\% & 42\%  \\
+        %\hline
+        %& \multicolumn{6}{c}{Redistancing, OpenMP} \\
+        %No reuse      & 1.246 & 9.508  & 49 & 15.7 &      &       \\
+        %Full reuse    & 0.245 & 11.324 & 9  & 18.1 & -7\% & 408\% \\
+        %Partial reuse & 0.749 & 9.308  & 5  & 15.6 & 7\%  & 66\%  \\
+        %\hline
+        %& \multicolumn{6}{c}{Redistancing, CUDA} \\
+        %No reuse      & 1.904 & 2.636 & 49 & 15.7 &      &       \\
+        %Full reuse    & 0.355 & 3.049 & 9  & 18.0 & 33\% & 436\% \\
+        %Partial reuse & 1.340 & 2.613 & 5  & 15.6 & 15\% & 42\%  \\
         \hline
         & \multicolumn{6}{c}{Navier-Stokes, OpenMP} \\
         No reuse      & 7.926 &  71.052 & 49 & 16.7 &       &       \\
@@ -249,7 +317,7 @@ the paper are described.
     \end{tabularx}
 \end{table}
 
-\section{Conclusion}
+\section{Conclusion} \label{sec:conclusion}
 
 \bibliographystyle{spmpsci}
 \bibliography{ref}
