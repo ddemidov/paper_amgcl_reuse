@@ -109,12 +109,12 @@ described with the \emph{transfer operators} $P$ (\emph{prolongation} or
 \begin{algorithm}
     \caption{AMG setup.}
     \begin{algorithmic} \label{alg:setup}
-        \STATE Start with a system matrix $A_1 \leftarrow A$.
+        \STATE Start with a system matrix $A_1 = A$.
         \WHILE{the matrix $A_i$ is too big to be solved directly}
             \STATE Construct the transfer operators $P_i$ and $R_i$.
             \STATE Construct the smoother $S_i$.
             \STATE Construct the coarser system using Galerkin operator: $A_{i+1}
-                \leftarrow R_i A_i P_i$.
+                = R_i A_i P_i$.
         \ENDWHILE
         \STATE Construct a direct solver for the coarsest system $A_L$.
     \end{algorithmic}
@@ -137,23 +137,23 @@ construction and the evaluation of the Galerkin operator.
     \caption{AMG V-cycle.}
     \begin{algorithmic} \label{alg:vcycle}
         \STATE Start at the finest level with an initial approximation
-        $u_1 \leftarrow u^0$.
+        $u_1 = u^0$.
         \WHILE{not converged}
             \FOR{each level of the hierarchy, finest-to-coarsest}
                 \STATE Apply a couple of smoothing iterations to the current
-                       solution: $u_i \leftarrow S_i(f_i, u_i)$.
-                \STATE Find residual $e_i \leftarrow f_i - A_i u_i$ and
+                       solution: $u_i = S_i(f_i, u_i)$.
+                \STATE Find residual $e_i = f_i - A_i u_i$ and
                        restrict it to the RHS on the coarser level:
-                       $f_{i+1} \leftarrow R_i e_i$.
+                       $f_{i+1} = R_i e_i$.
             \ENDFOR
             \STATE Solve the coarsest system directly:
-                   $u_L \leftarrow A_L^{-1} f_L$.
+                   $u_L = A_L^{-1} f_L$.
             \FOR{each level of the hierarchy, coarsest-to-finest}
                 \STATE Update the current solution with the interpolated
                        solution from the coarser level:
-                       $u_i \leftarrow u_i + P_i u_{i+1}$.
+                       $u_i = u_i + P_i u_{i+1}$.
                 \STATE Apply a couple of smoothing iterations to the current
-                       solution: $u_i \leftarrow S_i(f_i, u_i)$.
+                       solution: $u_i = S_i(f_i, u_i)$.
             \ENDFOR
         \ENDWHILE
     \end{algorithmic}
@@ -167,7 +167,7 @@ method. In this case a single V-cycle is used as a preconditioning step.
 \section{AMG reuse strategies} \label{sec:strategies}
 
 Here the AMG setup cost amortization strategies considered in
-the paper are described. 
+the paper are described.
 
 \begin{algorithm}
     \caption{Full rebuild of the AMG hierarchy.}
@@ -189,9 +189,11 @@ the paper are described.
                 \STATE Rebuild AMG hierarchy using the current system matrix
             \ELSE
                 \STATE \emph{Update the latest AMG hierarchy:}
-                \FOR{all levels $i$}
-                    \STATE $A_{i+1} \leftarrow R_i A_i P_i$
-                    \STATE $S_{i} \leftarrow S(A_i)$
+                \FOR{all levels of the hierarchy}
+                    \STATE Construct the smoother $S_i$ for the new system matrix
+                           $A_i$.
+                    \STATE Construct the coarser system using Galerkin operator:
+                           $A_{i+1} = R_i A_i P_i$.
                 \ENDFOR
                 \STATE Construct a direct solver for the coarsest system $A_L$.
             \ENDIF
@@ -262,10 +264,24 @@ element model based on a stabilized finite element method, using linear P1
 elements for all the unknowns. The level set equation has 104,401 unknowns and
 1,331,279 non-zero elements in the system matrix. The Navier-Stokes equation
 has 417,604 unknowns and 21,300,464 non-zero elements in the system matrix.
-In total, 50 time steps are made in the model example.  The level set equations
+In total, 49 time steps are made in the model example.  The level set equations
 and the Navier-Stokes equations on each of the time steps are treated as
 independent non-steady state problems in order to test the efficiency of the
 AMG setup cost amortization strategies considered here.
+
+Both sets of problems are solved using the BiCGStab iterative
+solver~\cite{barrett1994templates} preconditioned with non-smoothed aggregation
+AMG. The damped Jacobi iteration is used as a smoother on each level of the AMG
+hierarchy. Using the non-smoothed aggregation is beneficial in the case of
+partial reuse strategy, since the transfer operators in this case have minimal
+dependence on the system matrix values, and mostly depend on the matrix
+non-zero structure. The level set problem is solved using the scalar (double
+precision) AMGCL backend, and the Navier-Stokes is solved as a monolithic
+system using block-valued backend with $4 \times 4$ statically sized matrices
+as the matrix values~\cite{Demidov2020}.  The solution in both cases was
+parallelized with both OpenMP and CUDA technologies. All tests were conducted
+on a machine with 3.40GHz 4 core Intel Core i5-3570K CPU and NVIDIA GeForce GTX
+1050 Ti GPU.
 
 \begin{table}
     \caption{Relative cost of the setup operations from \Cref{alg:setup}.}
@@ -305,16 +321,6 @@ from the setup, which allows to save 20 to 60\% of the setup cost.
         No reuse      & 1.890 & 0.781 & 49 & 5.0 &       &         \\
         Full reuse    & 0.039 & 0.897 & 1  & 5.5 & 185\% & 4,746\% \\
         Partial reuse & 1.284 & 0.781 & 5  & 5.0 & 29\%  & 47\%    \\
-        %\hline
-        %& \multicolumn{6}{c}{Redistancing, OpenMP} \\
-        %No reuse      & 1.246 & 9.508  & 49 & 15.7 &      &       \\
-        %Full reuse    & 0.245 & 11.324 & 9  & 18.1 & -7\% & 408\% \\
-        %Partial reuse & 0.749 & 9.308  & 5  & 15.6 & 7\%  & 66\%  \\
-        %\hline
-        %& \multicolumn{6}{c}{Redistancing, CUDA} \\
-        %No reuse      & 1.904 & 2.636 & 49 & 15.7 &      &       \\
-        %Full reuse    & 0.355 & 3.049 & 9  & 18.0 & 33\% & 436\% \\
-        %Partial reuse & 1.340 & 2.613 & 5  & 15.6 & 15\% & 42\%  \\
         \hline
         & \multicolumn{6}{c}{Navier-Stokes, OpenMP} \\
         No reuse      & 7.926 &  71.052 & 49 & 16.7 &       &       \\
@@ -328,7 +334,57 @@ from the setup, which allows to save 20 to 60\% of the setup cost.
     \end{tabularx}
 \end{table}
 
+\Cref{tab:strategies} compares the achieved cost savings for the no reuse (the
+AMG is completely rebuilt from scratch on each of the time steps), full reuse,
+and partial reuse strategies on the example of the level set and the
+Navier-Stokes equations, solved with OpenMP and CUDA backends. The columns show
+the setup and solve times in seconds (accumulated across all of the time steps;
+the total compute time may be obtained as a sum of these two columns), the
+number of full rebuilds of the AMG hierarchy, the average number of iterations
+on a time step, and the speedup observed for the total compute time and the AMG
+setup time.
+
+The results show that the full reuse strategy may be a hit or miss depending on
+the problem that is being solved. Specifically, it appears that the AMG
+preconditioner constructed for the level set problem at the first times step is
+fully applicable to the rest of the time steps. The setup only had to be
+performed once, which yields the total speedup of 22\% for the OpenMP backend
+and 185\% for the CUDA-accelerated backend. However, for the Navier-Stokes
+problem a preconditioner constructed for one time step is completely
+unapplicable on the next time step, which is obvious from the jump in the
+average number of iterations (about 17 iterations in the no-reuse case vs 46
+iterations in the full reuse case). In fact, the solution here was not able to
+fully converge over the maximum number of 100 iterations on the every other
+step, and the strategy has negative speedup.
+
+On the contrary, the partial reuse strategy shows consistently positive results
+for both of the problems. The average number of iterations practically does not
+grow, and the setup time is reduced by 20\% to 60\%. The total speedup in the
+case of the level set problem is 13\% and 29\% for the OpenMP and CUDA backends
+correspondingly. In the case of the Navier-Stokes problem, where the setup
+takes relatively low time compared to the solution step, the observed total
+speedup is 2\% and 7\%.
+
+For both strategies, resusing the AMG setup makes more sense for the CUDA
+backend, where the solution time is about 4 times lower than on the OpenMP
+backend. This makes the amortization strategy more important, since the
+relative setup cost is that much higher.
+
 \section{Conclusion} \label{sec:conclusion}
+
+The partial reuse strategy allows to get rid of one significant step in the AMG
+setup algorithm, namely the construction of the transfer operators, which may
+be both expensive and serial in nature. Another possibility to reduce the setup
+cost is to reuse the knowledge about the system matrix non-zero pattern during
+the computation of the Galerkin product $A_{i+1} = R_i A_i P_i$. This would get
+rid of the symbolic step in the matrix-matrix product algorithm and potentially
+to halve the cost of the partial setup. However, this remains outside the scope
+of the current work.
+
+\section{Acknowledgements}
+
+The work was carried out at the JSCC RAS as part of the government assignment.
+The author would like to thank Dr. Riccardo Rossi for the helpful discussions.
 
 \bibliographystyle{spmpsci}
 \bibliography{ref}
