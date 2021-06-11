@@ -22,11 +22,13 @@ centertags]%
 
 \begin{document}
 
-\title{Reusing AMG Hierarchy for Solution of Non-Steady State Problems}
+\title{Cost Amortization of AMG Setup for\\ Solution of Non-Steady State Problems}
 \author{\firstname{D.~E.}~\surname{Demidov}}
 \affiliation{
-    Kazan Branch of Joint Supercomputer Center, Scientific Research Institute of System Analysis,
-    the Russian Academy of Sciences; 2/31, Lobachevskii str., Kazan 420111 Russia}
+    Kazan Branch of Joint Supercomputer Center,
+    Scientific Research Institute of System Analysis,
+    the Russian Academy of Sciences;
+    2/31, Lobachevskii str., Kazan 420111 Russia}
 
 \begin{abstract}
     The work considers the full reuse and the partial reuse strategies for the
@@ -39,24 +41,25 @@ centertags]%
 \end{abstract}
 
 \subclass{35-04, 65-04, 65Y05, 65Y10, 65Y15, 97N80}
-\keywords{AMG, partial reuse, non-steady state.}
+\keywords{AMG, setup cost amortization, reuse strategies, non-steady state.}
 
 \maketitle
 
 \section{Introduction}
 
 Most of the numerical simulation problems today involve solution of large
-sparse linear systems obtained from discretization of partial differential
-equations on either structured or unstructured meshes. The combination of a
-Krylov subspace method with algebraic multigrid (AMG) as a preconditioner is
-considered to be one the most effective choices for solution of such
-systems~\cite{brandt1985algebraic,ruge1987algebraic,Trottenberg2001}. One
-disadvantage of the AMG preconditioner is the high cost of its setup. Depending
-on the convergence rate of the iterative solution, the setup may take more than
-50\% of the total compute time. This cost is unavoidable when a steady state
-problem is being solved, but it could be amortized for non-steady state
-problems either by reusing the complete preconditioner on new time steps, or by
-partial updates to the preconditioner using the new system matrix.
+sparse linear systems of equations obtained from discretization of partial
+differential equations on either structured or unstructured meshes. The
+combination of a Krylov subspace method with algebraic multigrid (AMG) as a
+preconditioner is considered to be one the most effective choices for solution
+of such systems~\cite{brandt1985algebraic,ruge1987algebraic,Trottenberg2001}.
+However, the construction of an AMG preconditioner may take a considerable
+fraction of the total compute time. Depending on the convergence rate of the
+iterative solution, the setup may take more than 50\% of the total compute
+time. This cost is unavoidable when a steady state problem is being solved, but
+it could be amortized for non-steady state problems either by reusing the
+complete preconditioner on new time steps, or by partial updates to the
+preconditioner using the new system matrix.
 
 In this paper two possible strategies of amortizing the cost of the AMG setup
 are considered. The first one is the \emph{full reuse} strategy, described
@@ -96,7 +99,7 @@ amortization strategies, and presents the results of the numerical experiments.
 This section describes the basic principles behind the
 AMG~\cite{brandt1985algebraic, Stuben1999}.  The method solves a system of
 linear algebraic equations \begin{equation} \label{eq:auf} Au = f,
-\end{equation} where $A$ is a square matrix. Mutigrid methods are based on
+\end{equation} where $A$ is a square matrix. Multigrid methods are based on
 recursive application of a two-grid scheme, which combines \emph{relaxation}
 and \emph{coarse grid correction}. Relaxation, or smoothing iteration $S$, is a
 simple iterative method, such as a damped Jacobi or a Gauss--Seidel
@@ -108,7 +111,8 @@ described with the \emph{transfer operators} $P$ (\emph{prolongation} or
 
 \begin{algorithm}
     \caption{AMG setup.}
-    \begin{algorithmic} \label{alg:setup}
+    \label{alg:setup}
+    \begin{algorithmic}
         \STATE Start with a system matrix $A_1 = A$.
         \WHILE{the matrix $A_i$ is too big to be solved directly}
             \STATE Construct the transfer operators $P_i$ and $R_i$.
@@ -124,7 +128,8 @@ In geometric multigrid methods the matrices $A_i$ and operators $P_i$ and $R_i$
 are usually supplied by the user based on the problem geometry. In algebraic
 multigrid methods the grid hierarchy and the transfer operators are in general
 constructed automatically, based only on the algebraic properties of the
-matrix~$A$. \Cref{alg:setup} describes the \emph{setup} phase of a generic AMG
+matrix~$A$. Note that this step may be both computationally intensive and hard
+parallelize. \Cref{alg:setup} describes the \emph{setup} phase of a generic AMG
 method. Here, the transfer operators $P_i$ and $R_i$, as well as the smoother
 $S_i$ are constructed from the system matrix $A_i$ on each level of the AMG
 grid hierarchy (a common choice for the restriction operator $R$ is the
@@ -135,7 +140,8 @@ construction and the evaluation of the Galerkin operator.
 
 \begin{algorithm}
     \caption{AMG V-cycle.}
-    \begin{algorithmic} \label{alg:vcycle}
+    \label{alg:vcycle}
+    \begin{algorithmic}
         \STATE Start at the finest level with an initial approximation
         $u_1 = u^0$.
         \WHILE{not converged}
@@ -164,15 +170,23 @@ system using a simple V-cycle shown in \Cref{alg:vcycle}. Usually AMG is not
 used standalone, but as a preconditioner with an iterative Krylov subspace
 method. In this case a single V-cycle is used as a preconditioning step.
 
-\section{AMG reuse strategies} \label{sec:strategies}
+\section{AMG setup cost amortization strategies} \label{sec:strategies}
 
-Here the AMG setup cost amortization strategies considered in
-the paper are described.
+This section describes possible strategies for the AMG setup cost amortization
+when solving non-steady state problems. Generally speaking, a preconditioner
+for the matrix $A$ should be an approximation for its inverse $A^{-1}$. However,
+the approximation does not have to perfect for the iterative Krylov solver to
+work. During the solution of a non-steady state problem, the system matrices at
+adjacent time steps often have similar structure both in terms of a non-zero
+pattern and the specific non-zero values. Having this in mind, it should
+possible to reuse at least some of the work going into the construction of an
+AMG preconditioner.
 
 \begin{algorithm}
-    \caption{Full rebuild of the AMG hierarchy.}
+    \caption{Full reuse of the AMG hierarchy.}
+    \label{alg:full}
     \begin{algorithmic}
-        \FOR{all time steps}
+        \FOR{each time step}
             \IF{AMG hierarchy has to be rebuilt}
                 \STATE Rebuild AMG hierarchy using the current system matrix
             \ENDIF
@@ -181,14 +195,31 @@ the paper are described.
     \end{algorithmic}
 \end{algorithm}
 
+The full reuse strategy, introduced in~\cite{Demidov2012}, assumes that a
+preconditioner constructed for a time step $k$ may be applicable for a number
+of subsequent time steps. The decision on whether to reuse the current
+preconditioner or construct a new one is based on the performance of the
+preconditioner on the previous time step. In case the solution on the last time
+step was able to converge within the iteration limit $m$ specified by the user,
+the preconditioner is deemed good enough and is reused. Otherwise, new
+preconditioner is constructed for the current system matrix. The strategy is
+outlined in~\Cref{alg:full}. It was shown in~\cite{Demidov2012} that it works
+best when the solution step is accelerated with a GPU, which makes the relative
+setup cost to increase significantly. Without the solution acceleration, the
+full reuse strategy is often counterproductive, because the increased solution
+time neglects any savings in the setup cost.  Also, the outcome of the strategy
+highly depends on the iteration threshold parameter specified by the user,
+which makes it hard to automate.
+
 \begin{algorithm}
-    \caption{Partial rebuild of the AMG hierarchy.}
+    \caption{Partial reuse of the AMG hierarchy.}
+    \label{alg:partial}
     \begin{algorithmic}
-        \FOR{all time steps}
+        \FOR{each time step}
             \IF{AMG hierarchy has to be rebuilt}
                 \STATE Rebuild AMG hierarchy using the current system matrix
             \ELSE
-                \STATE \emph{Update the latest AMG hierarchy:}
+                \STATE \emph{// Update the latest AMG hierarchy:}
                 \FOR{all levels of the hierarchy}
                     \STATE Construct the smoother $S_i$ for the new system matrix
                            $A_i$.
@@ -205,15 +236,15 @@ the paper are described.
 \section{Numerical experiments} \label{sec:experiments}
 
 In order to test the cost amortization strategies described in the above
-section, a model two-fluid dam break scenario was modelled using the Kratos
-Multi-Phisics framework~\cite{Dadvand2010,Dadvand2013}. The source code for the
+section, the two-fluid dam break scenario was modelled using the Kratos
+Multi-Physics framework~\cite{Dadvand2010,Dadvand2013}. The source code for the
 example is available in~\cite{dambreak}. In the scenario, a water-filled cuboid
 is positioned in one part of the domain. It is released at the start time and
 the water spreads across the domain driven by gravity. The water hits an
 obstacle and splashes develop. More details on the boundary conditions and
 problem settings can be found in~\cite{Larese2008, Coppola2011}. There are
-two basic substeps needed to evolve the solution from time step $n$ to time
-step $n+1$:
+two basic substeps needed to evolve the solution from time step $k$ to time
+step~$k+1$:
 \begin{enumerate}
     \item Find the motion in both phases as the solution of the two-fluid
         Navier-Stokes equations;
@@ -233,7 +264,7 @@ two-fluid Navier-Stokes equations:
 where $\rho$ is the density, $\mathbf u$ is the velocity field, $\mu$ is the
 dynamic viscosity, $p$ is the pressure, $\mathbf \varepsilon(\cdot)$ is the
 symmetric gradient operator, and $\mathbf f$ is the external body force vector,
-which includes the gravity and bouyancy forces, if required. The density,
+which includes the gravity and buoyancy forces, if required. The density,
 velocity, dynamic viscosity, and pressure are defined as
 \begin{equation}
     \mathbf u, p, \rho, \mu = \begin{cases}
@@ -279,29 +310,35 @@ non-zero structure. The level set problem is solved using the scalar (double
 precision) AMGCL backend, and the Navier-Stokes is solved as a monolithic
 system using block-valued backend with $4 \times 4$ statically sized matrices
 as the matrix values~\cite{Demidov2020}.  The solution in both cases was
-parallelized with both OpenMP and CUDA technologies. All tests were conducted
-on a machine with 3.40GHz 4 core Intel Core i5-3570K CPU and NVIDIA GeForce GTX
-1050 Ti GPU.
+parallelized with OpenMP and CUDA technologies. All tests were conducted on a
+machine with 3.40GHz 4 core Intel Core i5-3570K CPU and NVIDIA GeForce GTX 1050
+Ti GPU.
 
 \begin{table}
     \caption{Relative cost of the setup operations from \Cref{alg:setup}.}
     \label{tab:setup}
     \centering
-    \begin{tabularx}{0.8\textwidth}{l|YY}
-        Step & Level set & Navier-Stokes \\
+    \begin{tabularx}{\textwidth}{l|YYYY}
+        Step & Level set (OpenMP) & Level set (CUDA) & Navier-Stokes (OpenMP) &
+        Navier-Stokes (CUDA) \\
         \hline
-        Transfer operators $P_i$ and $R_i$        & 48\% & 21\% \\
-        Galerkin operator $A_{i+1} = R_i A_i P_i$ & 29\% & 24\% \\
-        Smoother $S_i$                            &  3\% &  4\% \\
-        Direct solver for the coarsest system     &  1\% &  0\% \\
+        Transfer operators $P_i$ and $R_i$        & 56\% & 23\% & 39\% & 15\% \\
+        Galerkin operator $A_{i+1} = R_i A_i P_i$ & 36\% & 16\% & 44\% & 19\% \\
+        Smoother $S_i$                            &  5\% &  3\% &  8\% &  6\% \\
+        Direct solver for the coarsest system     &  2\% &  0\% &  0\% &  0\% \\
+        Move hierarchy to the backend             &  0\% & 56\% &  0\% & 55\% \\
     \end{tabularx}
 \end{table}
 
-\Cref{tab:setup} shows cost of each of the steps from \Cref{alg:setup} for the
-level set and Navier-Stokes problems relative to the complete setup time. The
-data shows that the construction of the transfer operators takes significant
-portion of the setup. The partial reuse strategy basically removes this step
-from the setup, which allows to save 20 to 60\% of the setup cost.
+\Cref{tab:setup} shows the cost of each of the steps from \Cref{alg:setup} for
+the level set and Navier-Stokes problems relative to the complete setup time.
+The data shows that the construction of the transfer operators takes
+significant portion of the setup. The partial reuse strategy basically removes
+this step from the setup, which allows to save 40 to 60\% of the setup cost.
+When the CUDA backend is used, an additional step of moving the constructed
+hierarchy to the GPU memory appears, which takes more than 50\% of the speedup.
+The relative cost of transfer operators construction grows proportionally
+smaller in this case, which yields lower savings in the setup time.
 
 \begin{table}
     \caption{Cost savings for the full and partial reuse strategies.}
@@ -313,24 +350,24 @@ from the setup, which allows to save 20 to 60\% of the setup cost.
         & Setup \newline speedup (\%) \\
         \hline
         & \multicolumn{6}{c}{Level set, OpenMP} \\
-        No reuse      & 1.145 & 2.780 & 49 & 5.0 &      &         \\
-        Full reuse    & 0.026 & 3.186 & 1  & 5.5 & 22\% & 4,303\% \\
-        Partial reuse & 0.703 & 2.769 & 5  & 5.0 & 13\% & 63\%    \\
+        No reuse      & 1.235 & 2.893 & 49 & 5.0 &      &         \\
+        Full reuse    & 0.021 & 3.132 &  1 & 5.5 & 31\% & 5,781\% \\
+        Partial reuse & 0.423 & 2.794 &  1 & 5.0 & 28\% &   192\% \\
         \hline
         & \multicolumn{6}{c}{Level set, CUDA} \\
-        No reuse      & 1.890 & 0.781 & 49 & 5.0 &       &         \\
-        Full reuse    & 0.039 & 0.897 & 1  & 5.5 & 185\% & 4,746\% \\
-        Partial reuse & 1.284 & 0.781 & 5  & 5.0 & 29\%  & 47\%    \\
+        No reuse      & 2.064 & 0.944 & 49 & 5.0 &       &         \\
+        Full reuse    & 0.037 & 0.904 &  1 & 5.5 & 220\% & 5,478\% \\
+        Partial reuse & 0.949 & 0.775 &  1 & 5.0 &  75\% &   117\% \\
         \hline
         & \multicolumn{6}{c}{Navier-Stokes, OpenMP} \\
-        No reuse      & 7.926 &  71.052 & 49 & 16.7 &       &       \\
-        Full reuse    & 3.859 & 239.322 & 25 & 45.6 & -68\% & 105\% \\
-        Partial reuse & 6.011 &  71.763 &  5 & 16.9 &   2\% &  32\% \\
+        No reuse      & 3.756 &  70.564 & 49 & 16.7 &  &  \\
+        Full reuse    & 1.960 & 194.310 & 25 & 45.6 & -62\% & 92\% \\
+        Partial reuse & 2.198 &  71.349 &  1 & 16.9 &   1\% & 71\% \\
         \hline
         & \multicolumn{6}{c}{Navier-Stokes, CUDA} \\
-        No reuse      & 13.789 & 21.398 & 49 & 16.7 &       &       \\
-        Full reuse    &  6.863 & 59.200 & 25 & 46.1 & -47\% & 101\% \\
-        Partial reuse & 11.209 & 21.597 &  5 & 16.9 &   7\% &  23\% \\
+        No reuse      & 9.766 & 21.429 & 49 & 16.7 &  &  \\
+        Full reuse    & 4.926 & 59.175 & 25 & 46.1 & -51\% & 98\% \\
+        Partial reuse & 7.049 & 21.603 &  1 & 16.9 &   9\% & 39\% \\
     \end{tabularx}
 \end{table}
 
@@ -348,10 +385,10 @@ The results show that the full reuse strategy may be a hit or miss depending on
 the problem that is being solved. Specifically, it appears that the AMG
 preconditioner constructed for the level set problem at the first times step is
 fully applicable to the rest of the time steps. The setup only had to be
-performed once, which yields the total speedup of 22\% for the OpenMP backend
-and 185\% for the CUDA-accelerated backend. However, for the Navier-Stokes
+performed once, which yields the total speedup of 31\% for the OpenMP backend
+and 220\% for the CUDA-accelerated backend. However, for the Navier-Stokes
 problem a preconditioner constructed for one time step is completely
-unapplicable on the next time step, which is obvious from the jump in the
+inapplicable on the next time step, which is obvious from the jump in the
 average number of iterations (about 17 iterations in the no-reuse case vs 46
 iterations in the full reuse case). In fact, the solution here was not able to
 fully converge over the maximum number of 100 iterations on the every other
@@ -359,16 +396,16 @@ step, and the strategy has negative speedup.
 
 On the contrary, the partial reuse strategy shows consistently positive results
 for both of the problems. The average number of iterations practically does not
-grow, and the setup time is reduced by 20\% to 60\%. The total speedup in the
-case of the level set problem is 13\% and 29\% for the OpenMP and CUDA backends
+grow, and the setup time is reduced by 40\% to 192\%. The total speedup in the
+case of the level set problem is 28\% and 75\% for the OpenMP and CUDA backends
 correspondingly. In the case of the Navier-Stokes problem, where the setup
 takes relatively low time compared to the solution step, the observed total
-speedup is 2\% and 7\%.
+speedup is 1\% and 9\%.
 
-For both strategies, resusing the AMG setup makes more sense for the CUDA
-backend, where the solution time is about 4 times lower than on the OpenMP
+For both strategies, reusing the AMG setup makes more sense for the CUDA
+backend, where the solution is about 3.5 times faster than on the OpenMP
 backend. This makes the amortization strategy more important, since the
-relative setup cost is that much higher.
+relative setup cost grows accordingly.
 
 \section{Conclusion} \label{sec:conclusion}
 
