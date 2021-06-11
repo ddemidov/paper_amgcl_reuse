@@ -26,7 +26,7 @@ centertags]%
 \author{\firstname{D.~E.}~\surname{Demidov}}
 \affiliation{
     Kazan Branch of Joint Supercomputer Center,
-    Scientific Research Institute of System Analysis,
+    Scientific Research Institute of System Analysis, \\
     the Russian Academy of Sciences;
     2/31, Lobachevskii str., Kazan 420111 Russia}
 
@@ -61,32 +61,30 @@ it could be amortized for non-steady state problems either by reusing the
 complete preconditioner on new time steps, or by partial updates to the
 preconditioner using the new system matrix.
 
-In this paper two possible strategies of amortizing the cost of the AMG setup
-are considered. The first one is the \emph{full reuse} strategy, described
-in~\cite{Demidov2012}, where the AMG preconditioner is used completely
-unaltered for as long as the solution is able to converge in a reasonable
-number of iterations.  Reusing the preconditioner this way may work when the
-system matrix changes slowly over the time. In this case there is a strong
-chance that a preconditioner constructed for a specific time step will act as a
-reasonably good preconditioner for a couple of subsequent time steps. However,
-the applicability of the preconditioner may deteriorate with time and may
-result in a convergence rate that is bad enough to neglect any time savings due
-to reusing the preconditioner. It was shown in~\cite{Demidov2012} that this
-strategy is mostly beneficial when the solution phase is comparable to or is
-cheaper than the setup phase. This may be the case when the solution phase is
-accelerated by using a GPU, or when just a couple of iterations are required
-for the solution to converge.
+The paper introduces the partial reuse strategy for AMG cost amortization when
+solving non-steady state problems. The AMG hierarchy is partially updated on
+each of the time steps. Namely, the transfer operators (restriction and
+interpolation) are reused, while the system matrices and the smoother operators
+on each level of the hierarchy are updated on every iteration.  Since the
+computation of the transfer operators may take up to 50\% of the setup, this
+allows to significantly reduce the setup time.
 
-The second approach considered here is the \emph{partial reuse} strategy, which
-was recently implemented in the opensource AMGCL library~\cite{Demidov2019,
-Demidov2020}. Here, the AMG hierarchy is partially updated on each of the time
-steps. Namely, the transfer operators (restriction and interpolation) are
-reused for a number of time steps, while the system matrices and the smoother
-operators on each level of the hierarchy are updated on every step.  It is
-shown that the partial reuse strategy is able to consistently reduce both the
-setup cost and the overall compute time, while the full reuse strategy may be
-either more efficient or counterproductive, depending on the problem that is
-being solved.
+The partial reuse strategy is compared to the full reuse one, described
+in~\cite{Demidov2012}. Here the AMG preconditioner is used completely unaltered
+for as long as the solution is able to converge within a reasonable number of
+iterations.  Reusing the preconditioner this way works when the system matrix
+changes slowly over time, since there is a strong chance that a preconditioner
+constructed for a specific time step will act as a reasonably good
+preconditioner for a couple of subsequent time steps. However, the convergence
+may deteriorate enough to neglect any time savings due to reusing the
+preconditioner. It was shown in~\cite{Demidov2012} that this strategy is mostly
+beneficial when the solution phase is comparable to or is cheaper than the
+setup phase. This may be the case when the solution phase is accelerated by
+using a GPU, or when just a couple of iterations are required for the solution
+to converge.  It is shown on the example of solving a two-fluid dam break
+scenario that the partial reuse strategy is able to consistently reduce both
+the setup cost and the overall compute time, while the full reuse strategy may
+be counterproductive, depending on the problem that is being solved.
 
 The rest of the paper is structured as follows. \Cref{sec:amg} provides an
 overview of the AMG method. \Cref{sec:strategies} describes the AMG setup cost
@@ -165,7 +163,7 @@ construction and the evaluation of the Galerkin operator.
     \end{algorithmic}
 \end{algorithm}
 
-After the AMG hierarchy has been constructed, it may be used to solve the
+After the AMG hierarchy has been constructed, it is used to solve the
 system using a simple V-cycle shown in \Cref{alg:vcycle}. Usually AMG is not
 used standalone, but as a preconditioner with an iterative Krylov subspace
 method. In this case a single V-cycle is used as a preconditioning step.
@@ -187,10 +185,10 @@ AMG preconditioner.
     \label{alg:full}
     \begin{algorithmic}
         \FOR{each time step}
-            \IF{AMG hierarchy has to be rebuilt}
-                \STATE Rebuild AMG hierarchy using the current system matrix
+            \IF{first step \OR AMG hierarchy has to be rebuilt}
+                \STATE Build AMG hierarchy using the current system matrix
             \ENDIF
-            \STATE Solve the current system using the latest AMG hierarchy
+            \STATE Solve the current system using the AMG preconditioner
         \ENDFOR
     \end{algorithmic}
 \end{algorithm}
@@ -200,26 +198,27 @@ preconditioner constructed for a time step $k$ may be applicable for a number
 of subsequent time steps. The decision on whether to reuse the current
 preconditioner or construct a new one is based on the performance of the
 preconditioner on the previous time step. In case the solution on the last time
-step was able to converge within the iteration limit $m$ specified by the user,
-the preconditioner is deemed good enough and is reused. Otherwise, new
+step was able to converge within the iteration limit specified by the user, the
+preconditioner is deemed good enough and is reused. Otherwise, new
 preconditioner is constructed for the current system matrix. The strategy is
 outlined in~\Cref{alg:full}. It was shown in~\cite{Demidov2012} that it works
 best when the solution step is accelerated with a GPU, which makes the relative
 setup cost to increase significantly. Without the solution acceleration, the
-full reuse strategy is often counterproductive, because the increased solution
-time neglects any savings in the setup cost.  Also, the outcome of the strategy
-highly depends on the iteration threshold parameter specified by the user,
-which makes it hard to automate.
+full reuse strategy is often counterproductive, because the increase in
+solution time due to the growing number of iterations neglects any savings in
+the setup cost.  Also, the outcome of the strategy highly depends on the
+iteration threshold parameter specified by the user, which makes it hard to
+automate.
 
 \begin{algorithm}
     \caption{Partial reuse of the AMG hierarchy.}
     \label{alg:partial}
     \begin{algorithmic}
         \FOR{each time step}
-            \IF{AMG hierarchy has to be rebuilt}
-                \STATE Rebuild AMG hierarchy using the current system matrix
+            \IF{first step}
+                \STATE Build AMG hierarchy using the current system matrix
             \ELSE
-                \STATE \emph{// Update the latest AMG hierarchy:}
+                \STATE \emph{// Update the AMG hierarchy:}
                 \FOR{all levels of the hierarchy}
                     \STATE Construct the smoother $S_i$ for the new system matrix
                            $A_i$.
@@ -228,10 +227,25 @@ which makes it hard to automate.
                 \ENDFOR
                 \STATE Construct a direct solver for the coarsest system $A_L$.
             \ENDIF
-            \STATE Solve the current system using the latest AMG hierarchy
+            \STATE Solve the current system using the AMG preconditioner
         \ENDFOR
     \end{algorithmic}
 \end{algorithm}
+
+As shown in~\cite{Demidov2012} and in the next section, the main assumption
+behind the full reuse strategy does not always hold, and the system matrix may
+change enough between adjacent time steps for the complete preconditioner reuse
+to be counterproductive. The partial reuse strategy proposed in this work tries
+to reuse as much as possible from the existing AMG hierarchy as well as
+incorporate the data from the new system matrix. In order to achieve this, the
+transfer operators on each level of the existing hierarchy are left untouched,
+and the system matrices on all levels are updated with the Galerkin operator
+$A_{i+1}=R_i A_i P_i$. This approach is especially well-suited for non-smoothed
+aggregation AMG, since transfer operators here mostly depend on the non-zero
+pattern of the system matrix, and not on its actual values. The non-zero
+pattern of the matrices obtained with discretization of partial differential
+equations on structured or unstructured grids rarely changes between time
+steps. The partial reuse strategy is outlined in~\Cref{alg:partial}.
 
 \section{Numerical experiments} \label{sec:experiments}
 
@@ -352,22 +366,22 @@ smaller in this case, which yields lower savings in the setup time.
         & \multicolumn{6}{c}{Level set, OpenMP} \\
         No reuse      & 1.235 & 2.893 & 49 & 5.0 &      &         \\
         Full reuse    & 0.021 & 3.132 &  1 & 5.5 & 31\% & 5,781\% \\
-        Partial reuse & 0.423 & 2.794 &  1 & 5.0 & 28\% &   192\% \\
+        Partial reuse & 0.423 & 2.794 & 49 & 5.0 & 28\% &   192\% \\
         \hline
         & \multicolumn{6}{c}{Level set, CUDA} \\
         No reuse      & 2.064 & 0.944 & 49 & 5.0 &       &         \\
         Full reuse    & 0.037 & 0.904 &  1 & 5.5 & 220\% & 5,478\% \\
-        Partial reuse & 0.949 & 0.775 &  1 & 5.0 &  75\% &   117\% \\
+        Partial reuse & 0.949 & 0.775 & 49 & 5.0 &  75\% &   117\% \\
         \hline
         & \multicolumn{6}{c}{Navier-Stokes, OpenMP} \\
         No reuse      & 3.756 &  70.564 & 49 & 16.7 &  &  \\
         Full reuse    & 1.960 & 194.310 & 25 & 45.6 & -62\% & 92\% \\
-        Partial reuse & 2.198 &  71.349 &  1 & 16.9 &   1\% & 71\% \\
+        Partial reuse & 2.198 &  71.349 & 49 & 16.9 &   1\% & 71\% \\
         \hline
         & \multicolumn{6}{c}{Navier-Stokes, CUDA} \\
         No reuse      & 9.766 & 21.429 & 49 & 16.7 &  &  \\
         Full reuse    & 4.926 & 59.175 & 25 & 46.1 & -51\% & 98\% \\
-        Partial reuse & 7.049 & 21.603 &  1 & 16.9 &   9\% & 39\% \\
+        Partial reuse & 7.049 & 21.603 & 49 & 16.9 &   9\% & 39\% \\
     \end{tabularx}
 \end{table}
 
@@ -409,14 +423,22 @@ relative setup cost grows accordingly.
 
 \section{Conclusion} \label{sec:conclusion}
 
-The partial reuse strategy allows to get rid of one significant step in the AMG
-setup algorithm, namely the construction of the transfer operators, which may
-be both expensive and serial in nature. Another possibility to reduce the setup
-cost is to reuse the knowledge about the system matrix non-zero pattern during
-the computation of the Galerkin product $A_{i+1} = R_i A_i P_i$. This would get
-rid of the symbolic step in the matrix-matrix product algorithm and potentially
-to halve the cost of the partial setup. However, this remains outside the scope
-of the current work.
+The partial reuse strategy may still require a full rebuild occasionally, for
+example if the matrix size changes between time steps as a result of adaptive
+remeshing or for other reasons. Also, the quality of the updated preconditioner
+may deteriorate as the system matrix diverges from its initial state, so it may
+be beneficial to do preventive full rebuilds from time to time. This could be
+done either regularly (every $m$-th time step) or using some convergence
+quality criteria, similar to the full reuse strategy.
+
+The AMG setup cost amortization strategy strategy proposed here allows to get
+rid of one significant step in the AMG setup algorithm, namely the construction
+of the transfer operators, which may be both expensive and serial in nature.
+Another possibility to reduce the setup cost is to reuse the knowledge about
+the system matrix non-zero pattern during the computation of the Galerkin
+product $A_{i+1} = R_i A_i P_i$. This would get rid of the symbolic step in the
+matrix-matrix product algorithm and potentially could halve the cost of the
+partial setup. However, this remains outside the scope of the current work.
 
 \section{Acknowledgements}
 
