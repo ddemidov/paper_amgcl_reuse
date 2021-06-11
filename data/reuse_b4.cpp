@@ -27,6 +27,8 @@
 #endif
 
 using amgcl::precondition;
+namespace amgcl { profiler<> prof; }
+using amgcl::prof;
 
 //---------------------------------------------------------------------------
 ptrdiff_t read_problem(int k,
@@ -142,7 +144,6 @@ int main(int argc, char *argv[]) {
         > Solver;
 
     std::shared_ptr<Solver> solve;
-    amgcl::profiler<> prof;
     size_t iters = 0;
     double error;
 
@@ -160,8 +161,8 @@ int main(int argc, char *argv[]) {
         }
 
         auto A = std::tie(rows, ptr, col, val);
-        auto Ab = amgcl::adapter::block_matrix<mat_type>(A);
-        b_rows = amgcl::backend::rows(Ab);
+        auto Ab = std::make_shared<Solver::build_matrix>(amgcl::adapter::block_matrix<mat_type>(A));
+        b_rows = amgcl::backend::rows(*Ab);
 
         // Rebuild the solver, if necessary
         bool full = false;

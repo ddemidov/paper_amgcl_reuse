@@ -23,6 +23,8 @@
 #include <amgcl/io/binary.hpp>
 
 using amgcl::precondition;
+namespace amgcl { profiler<> prof; }
+using amgcl::prof;
 
 //---------------------------------------------------------------------------
 ptrdiff_t read_problem(int k,
@@ -131,7 +133,6 @@ int main(int argc, char *argv[]) {
         > Solver;
 
     std::shared_ptr<Solver> solve;
-    amgcl::profiler<> prof;
     size_t iters = 0;
     double error;
 
@@ -148,7 +149,7 @@ int main(int argc, char *argv[]) {
             break;
         }
 
-        auto A = std::tie(rows, ptr, col, val);
+        auto A = std::make_shared<Solver::build_matrix>(std::tie(rows, ptr, col, val));
 
         // Rebuild the solver, if necessary
         bool full = false;

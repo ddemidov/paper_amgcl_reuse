@@ -23,6 +23,8 @@
 #include <amgcl/io/binary.hpp>
 
 using amgcl::precondition;
+namespace amgcl { profiler<> prof; }
+using amgcl::prof;
 
 //---------------------------------------------------------------------------
 ptrdiff_t read_problem(int k,
@@ -131,7 +133,6 @@ int main(int argc, char *argv[]) {
         > Solver;
 
     std::shared_ptr<Solver> solve;
-    amgcl::profiler<> prof;
     int iters = 0;
     double error;
 
@@ -148,7 +149,7 @@ int main(int argc, char *argv[]) {
             break;
         }
 
-        auto A = std::tie(rows, ptr, col, val);
+        auto A = std::make_shared<Solver::build_matrix>(std::tie(rows, ptr, col, val));
 
         // Rebuild the solver, if necessary
         bool full = false;
@@ -159,11 +160,7 @@ int main(int argc, char *argv[]) {
             solve = std::make_shared<Solver>(A, prm, bprm);
         }
 
-#if defined(SOLVER_BACKEND_VEXCL)
-        Backend::matrix Ab(ctx, rows, rows, ptr, col, val, true);
-#else
-        auto Ab = A;
-#endif
+        auto Ab = Backend::copy_matrix(A, bprm);
 
         auto f = Backend::copy_vector(rhs, bprm);
         auto x = Backend::create_vector(rows, bprm);
@@ -173,7 +170,7 @@ int main(int argc, char *argv[]) {
         {
             auto t1 = prof.scoped_tic("amgcl");
             auto t2 = prof.scoped_tic("solve");
-            std::tie(iters, error) = (*solve)(Ab, *f, *x);
+            std::tie(iters, error) = (*solve)(*Ab, *f, *x);
         }
 
         std::cout << time << "\t" << full << "\t" << iters << "\t" << error << std::endl;

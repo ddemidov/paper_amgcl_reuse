@@ -27,6 +27,8 @@
 #endif
 
 using amgcl::precondition;
+namespace amgcl { profiler<> prof; }
+using amgcl::prof;
 
 //---------------------------------------------------------------------------
 ptrdiff_t read_problem(int k,
@@ -142,7 +144,6 @@ int main(int argc, char *argv[]) {
         > Solver;
 
     std::shared_ptr<Solver> solve;
-    amgcl::profiler<> prof;
     int iters = 0;
     double error;
 
@@ -160,8 +161,8 @@ int main(int argc, char *argv[]) {
         }
 
         auto A = std::tie(rows, ptr, col, val);
-        auto Ab = amgcl::adapter::block_matrix<mat_type>(A);
-        b_rows = amgcl::backend::rows(Ab);
+        auto Ab = std::make_shared<Solver::build_matrix>(amgcl::adapter::block_matrix<mat_type>(A));
+        b_rows = amgcl::backend::rows(*Ab);
 
         // Rebuild the solver, if necessary
         bool full = false;
@@ -173,13 +174,7 @@ int main(int argc, char *argv[]) {
             solve = std::make_shared<Solver>(Ab, prm, bprm);
         }
 
-#if defined(SOLVER_BACKEND_VEXCL)
-        typedef amgcl::backend::crs<mat_type> build_matrix;
-        auto Ad = Backend::copy_matrix(std::make_shared<build_matrix>(Ab), bprm);
-#else
-        auto Ad = &Ab;
-#endif
-
+        auto Ad = Backend::copy_matrix(Ab, bprm);
         auto f = Backend::create_vector(b_rows, bprm);
         auto fptr = reinterpret_cast<const vec_type*>(&rhs[0]);
 #if defined(SOLVER_BACKEND_VEXCL)

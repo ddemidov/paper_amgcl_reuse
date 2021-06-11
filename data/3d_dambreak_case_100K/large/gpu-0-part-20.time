@@ -1,10 +1,2 @@
-
-[Profile:         253.841 s] (100.00%)
-[  amgcl:          32.568 s] ( 12.83%)
-[    setup:        11.125 s] (  4.38%)
-[      full:        0.957 s] (  0.38%)
-[      partial:    10.168 s] (  4.01%)
-[    solve:        21.443 s] (  8.45%)
-[  reading:       221.191 s] ( 87.14%)
-
-
+terminate called after throwing an instance of 'boost::wrapexcept<boost::program_options::multiple_occurrences>'
+  what():  option '--renew' cannot be specified more than once
