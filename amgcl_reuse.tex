@@ -22,7 +22,7 @@ centertags]%
 
 \begin{document}
 
-\title{Cost Amortization of AMG Setup for\\ Solution of Non-Steady State Problems}
+\title{Partial Reuse AMG Setup Cost Amortization Strategy for the Solution of Non-Steady State Problems}
 \author{\firstname{D.~E.}~\surname{Demidov}}
 \affiliation{
     Kazan Branch of Joint Supercomputer Center,
@@ -31,17 +31,19 @@ centertags]%
     2/31, Lobachevskii str., Kazan 420111 Russia}
 
 \begin{abstract}
-    The work considers the full reuse and the partial reuse strategies for the
-    algebraic multigrid (AMG) setup cost amortization for the case of a
-    non-steady state problem solution. It is shown on the model example of a
-    dam break fluid dynamics problem that the partial reuse strategy is able to
-    consistently reduce the cost of the AMG setup across multiple time steps.
-    The strategy may save up to 50\% of the setup time and, depending on the
-    relative cost of the setup, up to 20\% of the total compute time.
+    The partial reuse algebraic multigrid (AMG) setup cost amortization
+    strategy is presented for the solution of non-steady state problems. The
+    transfer operators are reused from the previous time steps, and the system
+    matrices and the smoother operators are rebuilt on each of the AMG
+    hierarchy levels. It is shown on the example of modelling a two-fluid dam
+    break scenario that the strategy may decrease the AMG preconditioner setup
+    cost by 40\% to 200\%. The total compute time is decreased by up to 20\%,
+    but the specific outcome depends on the fraction of time that the setup
+    step initially takes.
 \end{abstract}
 
 \subclass{35-04, 65-04, 65Y05, 65Y10, 65Y15, 97N80}
-\keywords{AMG, setup cost amortization, reuse strategies, non-steady state.}
+\keywords{AMG, setup cost amortization, non-steady state, reuse strategies.}
 
 \maketitle
 
@@ -55,36 +57,38 @@ preconditioner is considered to be one the most effective choices for solution
 of such systems~\cite{brandt1985algebraic,ruge1987algebraic,Trottenberg2001}.
 However, the construction of an AMG preconditioner may take a considerable
 fraction of the total compute time. Depending on the convergence rate of the
-iterative solution, the setup may take more than 50\% of the total compute
-time. This cost is unavoidable when a steady state problem is being solved, but
-it could be amortized for non-steady state problems either by reusing the
-complete preconditioner on new time steps, or by partial updates to the
-preconditioner using the new system matrix.
+iterative solution, more than 50\% of the computations could be spent on the
+setup. This cost is unavoidable when a steady state problem is being solved,
+but it could be amortized for non-steady state problems either by reusing the
+work that went into construction of the preconditioner.
 
-The paper introduces the partial reuse strategy for AMG cost amortization when
-solving non-steady state problems. The AMG hierarchy is partially updated on
-each of the time steps. Namely, the transfer operators (restriction and
-interpolation) are reused, while the system matrices and the smoother operators
-on each level of the hierarchy are updated on every iteration.  Since the
-computation of the transfer operators may take up to 50\% of the setup, this
-allows to significantly reduce the setup time.
+The paper introduces the partial reuse AMG setup cost amortization strategy for
+the solution of non-steady state problems. The AMG hierarchy is partially
+updated on each of the time steps: the transfer operators (restriction and
+interpolation) are kept from the previous time steps, while the system matrices
+and the smoother operators on each level of the hierarchy are updated on every
+iteration.  Since the computation of the transfer operators may take up to 50\%
+of the setup, this allows to significantly reduce the setup time, while keeping
+the preconditioner up to date with the latest system matrix changes. The
+approach has been recently implemented in the opensource AMGCL
+library~\cite{Demidov2019, Demidov2020}.
 
 The partial reuse strategy is compared to the full reuse one, described
-in~\cite{Demidov2012}. Here the AMG preconditioner is used completely unaltered
-for as long as the solution is able to converge within a reasonable number of
-iterations.  Reusing the preconditioner this way works when the system matrix
-changes slowly over time, since there is a strong chance that a preconditioner
-constructed for a specific time step will act as a reasonably good
-preconditioner for a couple of subsequent time steps. However, the convergence
-may deteriorate enough to neglect any time savings due to reusing the
-preconditioner. It was shown in~\cite{Demidov2012} that this strategy is mostly
-beneficial when the solution phase is comparable to or is cheaper than the
-setup phase. This may be the case when the solution phase is accelerated by
-using a GPU, or when just a couple of iterations are required for the solution
-to converge.  It is shown on the example of solving a two-fluid dam break
-scenario that the partial reuse strategy is able to consistently reduce both
-the setup cost and the overall compute time, while the full reuse strategy may
-be counterproductive, depending on the problem that is being solved.
+in~\cite{Demidov2012}. There the AMG preconditioner is used completely
+unaltered for as many time steps as the solution is able to converge within a
+reasonable number of iterations.  Reusing the preconditioner this way works
+when the system matrix changes slowly over time, since there is a strong chance
+that a preconditioner constructed for a specific time step will act as a
+reasonably good preconditioner for a couple of subsequent time steps. However,
+the convergence may deteriorate enough to neglect any time savings due to
+reusing the preconditioner. It was shown in~\cite{Demidov2012} that this
+strategy is mostly beneficial when the solution phase is comparable to or is
+cheaper than the setup phase, which may be the case when the solution phase is
+accelerated by using a GPU, or when just a couple of iterations are required
+for the solution to converge.  Here it is shown on the example of solving a
+two-fluid dam break scenario that the partial reuse strategy is able to
+consistently reduce both the setup cost and the overall compute time, even when
+the full reuse strategy is counterproductive.
 
 The rest of the paper is structured as follows. \Cref{sec:amg} provides an
 overview of the AMG method. \Cref{sec:strategies} describes the AMG setup cost
@@ -98,11 +102,11 @@ This section describes the basic principles behind the
 AMG~\cite{brandt1985algebraic, Stuben1999}.  The method solves a system of
 linear algebraic equations \begin{equation} \label{eq:auf} Au = f,
 \end{equation} where $A$ is a square matrix. Multigrid methods are based on
-recursive application of a two-grid scheme, which combines \emph{relaxation}
+recursive application of the two-grid scheme, which combines \emph{relaxation}
 and \emph{coarse grid correction}. Relaxation, or smoothing iteration $S$, is a
-simple iterative method, such as a damped Jacobi or a Gauss--Seidel
+simple iterative method, such as damped Jacobi or Gauss--Seidel
 iteration~\cite{barrett1994templates}. Coarse grid correction solves the
-residual equation on a coarser grid, and improves the fine-grid approximation
+residual equation on the coarser grid, and improves the fine-grid approximation
 with the interpolated coarse-grid solution. Transfer between the grids is
 described with the \emph{transfer operators} $P$ (\emph{prolongation} or
 \emph{interpolation}) and $R$ (\emph{restriction}).
@@ -111,8 +115,8 @@ described with the \emph{transfer operators} $P$ (\emph{prolongation} or
     \caption{AMG setup.}
     \label{alg:setup}
     \begin{algorithmic}
-        \STATE Start with a system matrix $A_1 = A$.
-        \WHILE{the matrix $A_i$ is too big to be solved directly}
+        \STATE Start with the system matrix $A_1 = A$.
+        \WHILE{the matrix $A_i$ is too large to be solved directly}
             \STATE Construct the transfer operators $P_i$ and $R_i$.
             \STATE Construct the smoother $S_i$.
             \STATE Construct the coarser system using Galerkin operator: $A_{i+1}
@@ -122,19 +126,20 @@ described with the \emph{transfer operators} $P$ (\emph{prolongation} or
     \end{algorithmic}
 \end{algorithm}
 
-In geometric multigrid methods the matrices $A_i$ and operators $P_i$ and $R_i$
-are usually supplied by the user based on the problem geometry. In algebraic
-multigrid methods the grid hierarchy and the transfer operators are in general
-constructed automatically, based only on the algebraic properties of the
-matrix~$A$. Note that this step may be both computationally intensive and hard
-parallelize. \Cref{alg:setup} describes the \emph{setup} phase of a generic AMG
-method. Here, the transfer operators $P_i$ and $R_i$, as well as the smoother
-$S_i$ are constructed from the system matrix $A_i$ on each level of the AMG
-grid hierarchy (a common choice for the restriction operator $R$ is the
-transpose of the prolongation operator $R=P^T$). Note that the next level in
-the AMG hierarchy is fully defined by the transfer operators $P_i$ and $R_i$.
-The most time consuming steps of the setup are the transfer operators
-construction and the evaluation of the Galerkin operator.
+In geometric multigrid methods the grid hierarchy, and the matrices $A_i$ and
+operators $P_i$ and $R_i$ on each level of the hierarchy are supplied by the
+user based on the problem geometry. In algebraic multigrid methods the grid
+hierarchy and the transfer operators are in general constructed automatically,
+based only on the algebraic properties of the matrix~$A$. Note that this step
+may be both computationally intensive and hard to parallelize. \Cref{alg:setup}
+describes the \emph{setup} phase of a generic AMG method. Here, the transfer
+operators $P_i$ and $R_i$, as well as the smoother $S_i$ are constructed from
+the system matrix $A_i$ on each level of the AMG grid hierarchy (a common
+choice for the restriction operator $R$ is the transpose of the prolongation
+operator $R=P^T$). The next coarser level of the AMG hierarchy is fully defined
+by the transfer operators $P_i$ and $R_i$.  Usually the most time consuming
+steps of the setup are the transfer operators construction and the evaluation
+of the Galerkin operator.
 
 \begin{algorithm}
     \caption{AMG V-cycle.}
@@ -170,15 +175,15 @@ method. In this case a single V-cycle is used as a preconditioning step.
 
 \section{AMG setup cost amortization strategies} \label{sec:strategies}
 
-This section describes possible strategies for the AMG setup cost amortization
-when solving non-steady state problems. Generally speaking, a preconditioner
-for the matrix $A$ should be an approximation for its inverse $A^{-1}$. However,
-the approximation does not have to perfect for the iterative Krylov solver to
-work. During the solution of a non-steady state problem, the system matrices at
-adjacent time steps often have similar structure both in terms of a non-zero
-pattern and the specific non-zero values. Having this in mind, it should
-possible to reuse at least some of the work going into the construction of an
-AMG preconditioner.
+This section describes possible AMG setup cost amortization strategies for the
+solution of non-steady state problems. Generally speaking, a preconditioner for
+the matrix $A$ should be an approximation for its inverse $A^{-1}$. However,
+the approximation does not have to be perfect for the iterative Krylov solver
+to work. During the solution of a non-steady state problem, the system matrices
+at the adjacent time steps often have similar structure both in terms of the
+non-zero pattern and the specific non-zero values of the matrix. Having this in
+mind, it should be possible to reuse at least some of the work going into the
+construction of an AMG preconditioner.
 
 \begin{algorithm}
     \caption{Full reuse of the AMG hierarchy.}
@@ -197,18 +202,18 @@ The full reuse strategy, introduced in~\cite{Demidov2012}, assumes that a
 preconditioner constructed for a time step $k$ may be applicable for a number
 of subsequent time steps. The decision on whether to reuse the current
 preconditioner or construct a new one is based on the performance of the
-preconditioner on the previous time step. In case the solution on the last time
+preconditioner on the previous time step. When the solution on the last time
 step was able to converge within the iteration limit specified by the user, the
 preconditioner is deemed good enough and is reused. Otherwise, new
 preconditioner is constructed for the current system matrix. The strategy is
 outlined in~\Cref{alg:full}. It was shown in~\cite{Demidov2012} that it works
 best when the solution step is accelerated with a GPU, which makes the relative
 setup cost to increase significantly. Without the solution acceleration, the
-full reuse strategy is often counterproductive, because the increase in
-solution time due to the growing number of iterations neglects any savings in
-the setup cost.  Also, the outcome of the strategy highly depends on the
-iteration threshold parameter specified by the user, which makes it hard to
-automate.
+full reuse strategy is often counterproductive, because any savings in the
+setup cost are neglected by the increase in the solution time due to the
+growing number of iterations.  Also, the outcome of the strategy highly depends
+on the iteration threshold parameter specified by the user, which requires some
+experimentation for each problem.
 
 \begin{algorithm}
     \caption{Partial reuse of the AMG hierarchy.}
@@ -234,22 +239,31 @@ automate.
 
 As shown in~\cite{Demidov2012} and in the next section, the main assumption
 behind the full reuse strategy does not always hold, and the system matrix may
-change enough between adjacent time steps for the complete preconditioner reuse
-to be counterproductive. The partial reuse strategy proposed in this work tries
-to reuse as much as possible from the existing AMG hierarchy as well as
-incorporate the data from the new system matrix. In order to achieve this, the
-transfer operators on each level of the existing hierarchy are left untouched,
-and the system matrices on all levels are updated with the Galerkin operator
-$A_{i+1}=R_i A_i P_i$. This approach is especially well-suited for non-smoothed
-aggregation AMG, since transfer operators here mostly depend on the non-zero
-pattern of the system matrix, and not on its actual values. The non-zero
-pattern of the matrices obtained with discretization of partial differential
-equations on structured or unstructured grids rarely changes between time
-steps. The partial reuse strategy is outlined in~\Cref{alg:partial}.
+change enough between the adjacent time steps for the unaltered preconditioner
+reuse to be counterproductive. The partial reuse strategy proposed in this work
+tries to reuse as much as possible from the existing AMG hierarchy as well as
+to incorporate the data from the new system matrix. In order to achieve this,
+the transfer operators on each level of the existing hierarchy are left
+untouched, and the system matrices on all levels are updated with the Galerkin
+operator $A_{i+1}=R_i A_i P_i$. This approach is especially well-suited for
+non-smoothed aggregation AMG, since transfer operators here mostly depend on
+the non-zero pattern of the system matrix, and not on its actual values. The
+non-zero pattern of the matrices obtained with discretization of partial
+differential equations on structured or unstructured grids rarely changes
+between time steps. The partial reuse strategy is outlined
+in~\Cref{alg:partial}.
+
+The partial reuse strategy may still require a full rebuild occasionally, for
+example if the matrix size changes between time steps as a result of adaptive
+remeshing. Also, the quality of the updated preconditioner may deteriorate as
+the system matrix diverges from its initial state, so it may be beneficial to
+do preventive full rebuilds from time to time. This could be done either
+regularly (every $m$-th time step) or using some convergence quality criteria,
+similar to the full reuse strategy.
 
 \section{Numerical experiments} \label{sec:experiments}
 
-In order to test the cost amortization strategies described in the above
+In order to test the cost amortization strategies described in the previous
 section, the two-fluid dam break scenario was modelled using the Kratos
 Multi-Physics framework~\cite{Dadvand2010,Dadvand2013}. The source code for the
 example is available in~\cite{dambreak}. In the scenario, a water-filled cuboid
@@ -258,7 +272,7 @@ the water spreads across the domain driven by gravity. The water hits an
 obstacle and splashes develop. More details on the boundary conditions and
 problem settings can be found in~\cite{Larese2008, Coppola2011}. There are
 two basic substeps needed to evolve the solution from time step $k$ to time
-step~$k+1$:
+step~$k+1$, each step requiring a solution of a linear system of equations:
 \begin{enumerate}
     \item Find the motion in both phases as the solution of the two-fluid
         Navier-Stokes equations;
@@ -267,8 +281,8 @@ step~$k+1$:
 \end{enumerate}
 
 The velocity and pressure fields of two incompressible fluids moving in the
-domain $\Omega$ can be described by the incompressible
-two-fluid Navier-Stokes equations:
+domain $\Omega$ can be described by the incompressible two-fluid Navier-Stokes
+equations:
 \begin{gather}
     \rho \left[ \frac{\partial \mathbf u}{\partial t} + (\mathbf u \cdot \nabla)
     \mathbf u \right] - \nabla \cdot \left[ 2 \mu \mathbf \varepsilon(\mathbf
@@ -299,34 +313,35 @@ points belonging to $\Omega_1$, and negative values~--- to the points belonging
 to $\Omega_2$. The position of the fluid front will be defined by the iso-value
 contour $\psi(x, t) = 0$.  The evolution of the front $\psi = 0$ in any control
 volume $V_t \subset \Omega$ that is moving with a divergence-free velocity
-field $\mathbf u$ leads to
+field $\mathbf u$ is described by the equation
 \begin{equation}
     \frac{\partial \psi}{\partial t} + (\mathbf u \cdot \nabla) \psi = 0.
 \end{equation}
 
-Both the Navier-Stokes and the level set equations are solved using a finite
-element model based on a stabilized finite element method, using linear P1
-elements for all the unknowns. The level set equation has 104,401 unknowns and
-1,331,279 non-zero elements in the system matrix. The Navier-Stokes equation
-has 417,604 unknowns and 21,300,464 non-zero elements in the system matrix.
-In total, 49 time steps are made in the model example.  The level set equations
-and the Navier-Stokes equations on each of the time steps are treated as
-independent non-steady state problems in order to test the efficiency of the
-AMG setup cost amortization strategies considered here.
+Both the Navier-Stokes and the level set equations are discretized using a
+stabilized finite element method with linear P1 elements for all the unknowns.
+The resulting level set equation has 104,401 unknowns and 1,331,279 non-zero
+elements in the system matrix. The Navier-Stokes equation has 417,604 unknowns
+and 21,300,464 non-zero elements.  In total, 49 time steps are made in the
+model example.  The level set equations and the Navier-Stokes equations across
+the time steps are treated as independent non-steady state problems and are
+used to test the efficiency of the AMG setup cost amortization strategies
+considered here.
 
 Both sets of problems are solved using the BiCGStab iterative
 solver~\cite{barrett1994templates} preconditioned with non-smoothed aggregation
 AMG. The damped Jacobi iteration is used as a smoother on each level of the AMG
-hierarchy. Using the non-smoothed aggregation is beneficial in the case of
+hierarchy. Using the non-smoothed aggregation is beneficial in the case of the
 partial reuse strategy, since the transfer operators in this case have minimal
 dependence on the system matrix values, and mostly depend on the matrix
-non-zero structure. The level set problem is solved using the scalar (double
-precision) AMGCL backend, and the Navier-Stokes is solved as a monolithic
-system using block-valued backend with $4 \times 4$ statically sized matrices
-as the matrix values~\cite{Demidov2020}.  The solution in both cases was
-parallelized with OpenMP and CUDA technologies. All tests were conducted on a
-machine with 3.40GHz 4 core Intel Core i5-3570K CPU and NVIDIA GeForce GTX 1050
-Ti GPU.
+non-zero structure. The implementation uses the AMGCL
+library~\cite{Demidov2019, Demidov2020}. The level set problem is solved using
+the scalar (double precision) AMGCL backend, and the Navier-Stokes is solved as
+a monolithic system using block-valued backend with $4 \times 4$ statically
+sized matrices as the matrix values~\cite{Demidov2021}.  The solution in both
+cases was parallelized with OpenMP and CUDA technologies. All tests were
+conducted on a machine with 3.40GHz 4 core Intel Core i5-3570K CPU and NVIDIA
+GeForce GTX 1050 Ti GPU.
 
 \begin{table}
     \caption{Relative cost of the setup operations from \Cref{alg:setup}.}
@@ -346,13 +361,14 @@ Ti GPU.
 
 \Cref{tab:setup} shows the cost of each of the steps from \Cref{alg:setup} for
 the level set and Navier-Stokes problems relative to the complete setup time.
-The data shows that the construction of the transfer operators takes
-significant portion of the setup. The partial reuse strategy basically removes
-this step from the setup, which allows to save 40 to 60\% of the setup cost.
-When the CUDA backend is used, an additional step of moving the constructed
-hierarchy to the GPU memory appears, which takes more than 50\% of the speedup.
-The relative cost of transfer operators construction grows proportionally
-smaller in this case, which yields lower savings in the setup time.
+The construction of the transfer operators takes significant portion of the
+setup. The partial reuse strategy basically removes this step from the setup,
+which allows to save 40 to 60\% of the setup cost.  When the CUDA backend is
+used to accelerate the solution, an additional step of moving the constructed
+hierarchy to the GPU memory appears in the setup, which consumes more than 50\%
+of the setup time.  The relative cost of transfer operators construction grows
+proportionally smaller in this case, which yields lower savings in the setup
+time.
 
 \begin{table}
     \caption{Cost savings for the full and partial reuse strategies.}
@@ -385,35 +401,36 @@ smaller in this case, which yields lower savings in the setup time.
     \end{tabularx}
 \end{table}
 
-\Cref{tab:strategies} compares the achieved cost savings for the no reuse (the
-AMG is completely rebuilt from scratch on each of the time steps), full reuse,
-and partial reuse strategies on the example of the level set and the
-Navier-Stokes equations, solved with OpenMP and CUDA backends. The columns show
-the setup and solve times in seconds (accumulated across all of the time steps;
-the total compute time may be obtained as a sum of these two columns), the
-number of full rebuilds of the AMG hierarchy, the average number of iterations
-on a time step, and the speedup observed for the total compute time and the AMG
-setup time.
+\Cref{tab:strategies} compares the achieved cost savings for the no-reuse case
+used as a baseline (the AMG is completely rebuilt from scratch on each of the
+time steps), full reuse, and partial reuse strategies on the example of the
+level set and the Navier-Stokes equations, solved with OpenMP and CUDA
+backends. The columns show the setup and solve times in seconds (accumulated
+across all of the time steps; the total compute time may be obtained as a sum
+of these two columns), the number of full rebuilds of the AMG hierarchy, the
+average number of iterations on a single time step, and the speedup observed
+for the total compute time and the AMG setup time when using one of the
+considered amortization strategies.
 
-The results show that the full reuse strategy may be a hit or miss depending on
-the problem that is being solved. Specifically, it appears that the AMG
-preconditioner constructed for the level set problem at the first times step is
-fully applicable to the rest of the time steps. The setup only had to be
-performed once, which yields the total speedup of 31\% for the OpenMP backend
-and 220\% for the CUDA-accelerated backend. However, for the Navier-Stokes
-problem a preconditioner constructed for one time step is completely
-inapplicable on the next time step, which is obvious from the jump in the
+The results show that the full reuse strategy, as expected, may be a hit or
+miss depending on the problem that is being solved. Specifically, it appears
+that the AMG preconditioner constructed for the level set problem at the first
+time step is fully applicable to the rest of the time steps. The setup only had
+to be performed once, which yields the total speedup of 31\% for the OpenMP
+backend and 220\% for the CUDA-accelerated backend. However, for the
+Navier-Stokes problem a preconditioner constructed for one time step shows bad
+convergence on the next time step, which is obvious from the jump in the
 average number of iterations (about 17 iterations in the no-reuse case vs 46
 iterations in the full reuse case). In fact, the solution here was not able to
 fully converge over the maximum number of 100 iterations on the every other
-step, and the strategy has negative speedup.
+step, and the strategy has negative total speedup.
 
 On the contrary, the partial reuse strategy shows consistently positive results
 for both of the problems. The average number of iterations practically does not
-grow, and the setup time is reduced by 40\% to 192\%. The total speedup in the
+grow, and the setup time is reduced by 39\% to 192\%. The total speedup in the
 case of the level set problem is 28\% and 75\% for the OpenMP and CUDA backends
 correspondingly. In the case of the Navier-Stokes problem, where the setup
-takes relatively low time compared to the solution step, the observed total
+takes only a small fraction of the total compute time, the observed total
 speedup is 1\% and 9\%.
 
 For both strategies, reusing the AMG setup makes more sense for the CUDA
@@ -423,13 +440,16 @@ relative setup cost grows accordingly.
 
 \section{Conclusion} \label{sec:conclusion}
 
-The partial reuse strategy may still require a full rebuild occasionally, for
-example if the matrix size changes between time steps as a result of adaptive
-remeshing or for other reasons. Also, the quality of the updated preconditioner
-may deteriorate as the system matrix diverges from its initial state, so it may
-be beneficial to do preventive full rebuilds from time to time. This could be
-done either regularly (every $m$-th time step) or using some convergence
-quality criteria, similar to the full reuse strategy.
+The partial reuse AMG setup cost amortization strategy for the solution of
+non-steady state problems introduced in this work is able to reduce the setup
+cost of an AMG preconditioner by about 40\% to 200\%. It is shown on the
+example of modelling the two-fluid dam break scenario that the strategy is able
+to robustly decrease the total compute time, as opposed to the full reuse
+strategy that may be counterproductive. The overall efficiency depends on the
+relative cost of the setup with respect to the total compute time.  Naturally,
+the approach outlined here makes more sense when the setup takes considerable
+fraction of the compute time, which is usually the case when the solution step
+is accelerated with a GPU, or the solution demonstrates fast convergence rate.
 
 The AMG setup cost amortization strategy strategy proposed here allows to get
 rid of one significant step in the AMG setup algorithm, namely the construction
