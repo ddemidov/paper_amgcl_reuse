@@ -147,6 +147,13 @@ FUNCTION {add.colon}
   if$
 }
 
+FUNCTION {add.comma}
+{ duplicate$ empty$
+    'skip$
+    { "," * add.blank }
+  if$
+}
+
 FUNCTION {date.block}
 {
   new.block
@@ -401,7 +408,7 @@ FUNCTION {format.names}
   numnames 'namesleft :=
     { namesleft #0 > }
     { s nameptr
-      "{vv~}{ll}{ jj}{, f{.}.}"
+      "{f{.}.~}{vv~}{ll}{ jj}"
       format.name$
       bibinfo bibinfo.check
       't :=
@@ -624,6 +631,33 @@ FUNCTION {format.date}
     {
       before.all 'output.state :=
     " (" swap$ * ")" *
+    }
+  if$
+}
+FUNCTION {format.date.noparen}
+{
+  ""
+  duplicate$ empty$
+  year  "year"  bibinfo.check duplicate$ empty$
+    { swap$ 'skip$
+        { "there's a month but no year in " cite$ * warning$ }
+      if$
+      *
+    }
+    { swap$ 'skip$
+        {
+          swap$
+          " " * swap$
+        }
+      if$
+      *
+    }
+  if$
+  duplicate$ empty$
+    'skip$
+    {
+      before.all 'output.state :=
+    " " swap$ *
     }
   if$
 }
@@ -968,7 +1002,7 @@ FUNCTION {format.organization.address}
 FUNCTION {article}
 { output.bibitem
   format.authors "author" output.check
-  add.colon
+  add.comma
   new.block
   format.title "title" output.check
   new.block
@@ -990,16 +1024,17 @@ FUNCTION {article}
   format.url output
   new.block
   format.note output
+  add.period$
   fin.entry
 }
 FUNCTION {book}
 { output.bibitem
   author empty$
     { format.editors "author and editor" output.check
-      add.colon
+      add.comma
     }
     { format.authors output.nonnull
-      add.colon
+      add.comma
       crossref missing$
         { "author and editor" editor either.or.check }
         'skip$
@@ -1021,18 +1056,20 @@ FUNCTION {book}
       format.book.crossref output.nonnull
     }
   if$
-  format.date "year" output.check
+  add.comma
+  format.date.noparen "year" output.check
   format.doi output
   new.block
   format.url output
   new.block
   format.note output
+  add.period$
   fin.entry
 }
 FUNCTION {booklet}
 { output.bibitem
   format.authors output
-  add.colon
+  add.comma
   new.block
   format.title "title" output.check
   new.block
@@ -1044,6 +1081,7 @@ FUNCTION {booklet}
   format.url output
   new.block
   format.note output
+  add.period$
   fin.entry
 }
 
@@ -1051,10 +1089,10 @@ FUNCTION {inbook}
 { output.bibitem
   author empty$
     { format.editors "author and editor" output.check
-      add.colon
+      add.comma
     }
     { format.authors output.nonnull
-      add.colon
+      add.comma
       crossref missing$
         { "author and editor" editor either.or.check }
         'skip$
@@ -1085,13 +1123,14 @@ FUNCTION {inbook}
   format.url output
   new.block
   format.note output
+  add.period$
   fin.entry
 }
 
 FUNCTION {incollection}
 { output.bibitem
   format.authors "author" output.check
-  add.colon
+  add.comma
   new.block
   format.title "title" output.check
   new.block
@@ -1113,12 +1152,13 @@ FUNCTION {incollection}
   format.url output
   new.block
   format.note output
+  add.period$
   fin.entry
 }
 FUNCTION {inproceedings}
 { output.bibitem
   format.authors "author" output.check
-  add.colon
+  add.comma
   new.block
   format.title "title" output.check
   new.block
@@ -1144,6 +1184,7 @@ FUNCTION {inproceedings}
   format.url output
   new.block
   format.note output
+  add.period$
   fin.entry
 }
 FUNCTION {conference} { inproceedings }
@@ -1159,7 +1200,7 @@ FUNCTION {manual}
     }
     { format.authors output.nonnull }
   if$
-  add.colon
+  add.comma
   new.block
   format.btitle "title" output.check
   author empty$
@@ -1184,13 +1225,14 @@ FUNCTION {manual}
   format.url output
   new.block
   format.note output
+  add.period$
   fin.entry
 }
 
 FUNCTION {mastersthesis}
 { output.bibitem
   format.authors "author" output.check
-  add.colon
+  add.comma
   new.block
   format.title
   "title" output.check
@@ -1204,13 +1246,14 @@ FUNCTION {mastersthesis}
   format.url output
   new.block
   format.note output
+  add.period$
   fin.entry
 }
 
 FUNCTION {misc}
 { output.bibitem
   format.authors output
-  add.colon
+  add.comma
   title howpublished new.block.checkb
   format.title output
   howpublished new.block.checka
@@ -1221,13 +1264,14 @@ FUNCTION {misc}
   format.url output
   new.block
   format.note output
+  add.period$
   fin.entry
   empty.misc.check
 }
 FUNCTION {phdthesis}
 { output.bibitem
   format.authors "author" output.check
-  add.colon
+  add.comma
   new.block
   format.title
   "title" output.check
@@ -1251,7 +1295,7 @@ FUNCTION {proceedings}
     }
     { format.editors output.nonnull }
   if$
-  add.colon
+  add.comma
   new.block
   format.btitle "title" output.check
   format.bvolume output
@@ -1289,7 +1333,7 @@ FUNCTION {proceedings}
 FUNCTION {techreport}
 { output.bibitem
   format.authors "author" output.check
-  add.colon
+  add.comma
   new.block
   format.title
   "title" output.check
@@ -1303,13 +1347,14 @@ FUNCTION {techreport}
   format.url output
   new.block
   format.note output
+  add.period$
   fin.entry
 }
 
 FUNCTION {unpublished}
 { output.bibitem
   format.authors "author" output.check
-  add.colon
+  add.comma
   new.block
   format.title "title" output.check
   format.date output
@@ -1489,13 +1534,13 @@ FUNCTION {begin.bib}
   write$ newline$
   "\providecommand{\url}[1]{{#1}}"
   write$ newline$
-  "\providecommand{\urlprefix}{URL }"
+  "\providecommand{\urlprefix}{URL: }"
   write$ newline$
   "\expandafter\ifx\csname urlstyle\endcsname\relax"
   write$ newline$
-  "  \providecommand{\doi}[1]{DOI~\discretionary{}{}{}#1}\else"
+  "  \providecommand{\doi}[1]{DOI:~\discretionary{}{}{}#1}\else"
   write$ newline$
-  "  \providecommand{\doi}{DOI~\discretionary{}{}{}\begingroup \urlstyle{rm}\Url}\fi"
+  "  \providecommand{\doi}{DOI:~\discretionary{}{}{}\begingroup \urlstyle{rm}\Url}\fi"
   write$ newline$
 }
 EXECUTE {begin.bib}
