@@ -31,6 +31,13 @@ centertags]%
     the Russian Academy of Sciences;
     2/31, Lobachevskii str., Kazan 420111 Russia}
 
+\firstcollaboration{(Submitted by A. M. Elizarov)} % Add if you know submitter.
+%\lastcollaboration{ }
+
+\received{May 30, 2021; revised June 15, 2021; accepted June 25,
+2021}
+
+
 \begin{abstract}
     The partial reuse algebraic multigrid (AMG) setup cost amortization
     strategy is presented for the solution of non-steady state problems. The
@@ -276,14 +283,14 @@ two basic substeps needed to evolve the solution from time step $k$ to time
 step~$k+1$, each step requiring a solution of a linear system of equations:
 \begin{enumerate}
     \item Find the motion in both phases as the solution of the two-fluid
-        Navier-Stokes equations;
+        Navier--Stokes equations;
     \item Determine the position of the interface by solving a convection
         equation for the level-set function.
 \end{enumerate}
 
 The velocity and pressure fields of two incompressible fluids moving in the
-domain $\Omega$ can be described by the incompressible two-fluid Navier-Stokes
-equations:
+domain $\Omega$ can be described by the incompressible two-fluid Navier--Stokes
+equations
 \begin{gather}
     \rho \left[ \frac{\partial \mathbf u}{\partial t} + (\mathbf u \cdot \nabla)
     \mathbf u \right] - \nabla \cdot \left[ 2 \mu \mathbf \varepsilon(\mathbf
@@ -319,12 +326,12 @@ field $\mathbf u$ is described by the equation
     \frac{\partial \psi}{\partial t} + (\mathbf u \cdot \nabla) \psi = 0.
 \end{equation}
 
-Both the Navier-Stokes and the level set equations are discretized using a
+Both the Navier--Stokes and the level set equations are discretized using a
 stabilized finite element method with linear P1 elements for all the unknowns.
 The resulting level set equation has 104,401 unknowns and 1,331,279 non-zero
-elements in the system matrix. The Navier-Stokes equation has 417,604 unknowns
+elements in the system matrix. The Navier--Stokes equation has 417,604 unknowns
 and 21,300,464 non-zero elements.  In total, 49 time steps are made in the
-model example.  The level set equations and the Navier-Stokes equations across
+model example.  The level set equations and the Navier--Stokes equations across
 the time steps are treated as independent non-steady state problems and are
 used to test the efficiency of the AMG setup cost amortization strategies
 considered here.
@@ -337,8 +344,8 @@ partial reuse strategy, since the transfer operators in this case have minimal
 dependence on the system matrix values, and mostly depend on the matrix
 non-zero structure. The implementation uses the AMGCL
 library~\cite{Demidov2019, Demidov2020}. The level set problem is solved using
-the scalar (double precision) AMGCL backend, and the Navier-Stokes is solved as
-a monolithic system using block-valued backend with $4 \times 4$ statically
+the scalar (double precision) AMGCL backend, and the Navier--Stokes is solved
+as a monolithic system using block-valued backend with $4 \times 4$ statically
 sized matrices as the matrix values~\cite{Demidov2021}.  The solution in both
 cases was parallelized with OpenMP and CUDA technologies. All tests were
 conducted on a machine with 3.40GHz 4 core Intel Core i5-3570K CPU and NVIDIA
@@ -349,8 +356,8 @@ GeForce GTX 1050 Ti GPU.
     \label{tab:setup}
     \centering
     \begin{tabularx}{\textwidth}{l|YYYY}
-        Step & Level set (OpenMP) & Level set (CUDA) & Navier-Stokes (OpenMP) &
-        Navier-Stokes (CUDA) \\
+        Step & Level set (OpenMP) & Level set (CUDA) & Navier--Stokes (OpenMP) &
+        Navier--Stokes (CUDA) \\
         \hline
         Transfer operators $P_i$ and $R_i$        & 56\% & 23\% & 39\% & 15\% \\
         Galerkin operator $A_{i+1} = R_i A_i P_i$ & 36\% & 16\% & 44\% & 19\% \\
@@ -361,7 +368,7 @@ GeForce GTX 1050 Ti GPU.
 \end{table}
 
 \Cref{tab:setup} shows the cost of each of the steps from \Cref{alg:setup} for
-the level set and Navier-Stokes problems relative to the complete setup time.
+the level set and Navier--Stokes problems relative to the complete setup time.
 The construction of the transfer operators takes significant portion of the
 setup. The partial reuse strategy basically removes this step from the setup,
 which allows to save 40 to 60\% of the setup cost.  When the CUDA backend is
@@ -390,12 +397,12 @@ time.
         Full reuse    & 0.037 & 0.904 &  1 & 5.5 & 220\% & 5,478\% \\
         Partial reuse & 0.949 & 0.775 & 49 & 5.0 &  75\% &   117\% \\
         \hline
-        & \multicolumn{6}{c}{Navier-Stokes, OpenMP} \\
+        & \multicolumn{6}{c}{Navier--Stokes, OpenMP} \\
         No reuse      & 3.756 &  70.564 & 49 & 16.7 &  &  \\
         Full reuse    & 1.960 & 194.310 & 25 & 45.6 & -62\% & 92\% \\
         Partial reuse & 2.198 &  71.349 & 49 & 16.9 &   1\% & 71\% \\
         \hline
-        & \multicolumn{6}{c}{Navier-Stokes, CUDA} \\
+        & \multicolumn{6}{c}{Navier--Stokes, CUDA} \\
         No reuse      & 9.766 & 21.429 & 49 & 16.7 &  &  \\
         Full reuse    & 4.926 & 59.175 & 25 & 46.1 & -51\% & 98\% \\
         Partial reuse & 7.049 & 21.603 & 49 & 16.9 &   9\% & 39\% \\
@@ -405,7 +412,7 @@ time.
 \Cref{tab:strategies} compares the achieved cost savings for the no-reuse case
 used as a baseline (the AMG is completely rebuilt from scratch on each of the
 time steps), full reuse, and partial reuse strategies on the example of the
-level set and the Navier-Stokes equations, solved with OpenMP and CUDA
+level set and the Navier--Stokes equations, solved with OpenMP and CUDA
 backends. The columns show the setup and solve times in seconds (accumulated
 across all of the time steps; the total compute time may be obtained as a sum
 of these two columns), the number of full rebuilds of the AMG hierarchy, the
@@ -414,12 +421,12 @@ for the total compute time and the AMG setup time when using one of the
 considered amortization strategies.
 
 The results show that the full reuse strategy, as expected, may be a hit or
-miss depending on the problem that is being solved. Specifically, it appears
+miss depending on the problem that is being solved.  Specifically, it appears
 that the AMG preconditioner constructed for the level set problem at the first
 time step is fully applicable to the rest of the time steps. The setup only had
 to be performed once, which yields the total speedup of 31\% for the OpenMP
 backend and 220\% for the CUDA-accelerated backend. However, for the
-Navier-Stokes problem a preconditioner constructed for one time step shows bad
+Navier--Stokes problem a preconditioner constructed for one time step shows bad
 convergence on the next time step, which is obvious from the jump in the
 average number of iterations (about 17 iterations in the no-reuse case vs 46
 iterations in the full reuse case). In fact, the solution here was not able to
@@ -430,7 +437,7 @@ On the contrary, the partial reuse strategy shows consistently positive results
 for both of the problems. The average number of iterations practically does not
 grow, and the setup time is reduced by 39\% to 192\%. The total speedup in the
 case of the level set problem is 28\% and 75\% for the OpenMP and CUDA backends
-correspondingly. In the case of the Navier-Stokes problem, where the setup
+correspondingly. In the case of the Navier--Stokes problem, where the setup
 takes only a small fraction of the total compute time, the observed total
 speedup is 1\% and 9\%.
 
@@ -466,7 +473,104 @@ partial setup. However, this remains outside the scope of the current work.
 The work was carried out at the JSCC RAS as part of the government assignment.
 The author would like to thank Dr. Riccardo Rossi for the helpful discussions.
 
-\bibliographystyle{spmpsci}
-\bibliography{ref}
+%\bibliographystyle{spmpsci}
+%bibliography{ref}
+
+\begin{thebibliography}{10}
+\providecommand{\url}[1]{{#1}}
+\providecommand{\urlprefix}{URL: }
+\expandafter\ifx\csname urlstyle\endcsname\relax
+  \providecommand{\doi}[1]{DOI:~\discretionary{}{}{}#1}\else
+  \providecommand{\doi}{DOI:~\discretionary{}{}{}\begingroup
+  \urlstyle{rm}\Url}\fi
+
+\bibitem{barrett1994templates}
+R.~Barrett, M.~Berry, T. F. Chan, J.~Demmel, J.~Donato, J.~Dongarra,
+  V.~Eijkhout, R.~Pozo, C.~Romine, and H.~Van~der Vorst, Templates for the solution
+  of linear systems: building blocks for iterative methods.
+\newblock SIAM,  1994.
+
+\bibitem{brandt1985algebraic}
+A.~Brandt, S.~McCormick, and J.~Huge, Algebraic multigrid ({AMG})
+for sparse matrix
+  equations.
+\newblock Sparsity and its Applications \textbf{257} (1985).
+
+\bibitem{Coppola2011}
+H.~Coppola-Owen and  R.~Codina, A free surface finite element model
+for low froude
+  number mould filling problems on fixed meshes.
+\newblock International J. for Numerical Methods in Fluids \textbf{66}(7),
+  833--851 (2011).
+
+\bibitem{Dadvand2013}
+P.~Dadvand, R.~Rossi, M.~Gil, X.~Martorell, J.~Cotela, E.~Juanpere,
+S. R.
+  Idelsohn, and  E.~O{\~{n}}ate, {Migration of a generic multi-physics framework to
+  HPC environments}.
+\newblock Computers and Fluids \textbf{80}(1), 301--309 (2013).
+\newblock \doi{10.1016/j.compfluid.2012.02.004}.
+
+\bibitem{Dadvand2010}
+P.~Dadvand, R.~Rossi, and  E.~O{\~{n}}ate, {An object-oriented
+environment for
+  developing finite element codes for multi-disciplinary applications}.
+\newblock Archives of Computational Methods in Engineering \textbf{17}(3),
+  253--297 (2010).
+\newblock \doi{10.1007/s11831-010-9045-2}.
+
+\bibitem{Demidov2019}
+D.~Demidov, {AMGCL}: An efficient, flexible, and extensible algebraic multigrid
+  implementation.
+\newblock Lobachevskii J. of Mathematics \textbf{40}(5), 535--546 (2019).
+\newblock \doi{10.1134/S1995080219050056}.
+
+\bibitem{Demidov2020}
+D.~Demidov, {AMGCL} -- a {C++} library for efficient solution of large sparse
+  linear systems.
+\newblock Software Impacts \textbf{6}, 100037 (2020).
+\newblock \doi{10.1016/j.simpa.2020.100037}.
+
+\bibitem{Demidov2021}
+D.~Demidov, L.~Mu, and B.~Wang, Accelerating linear solvers for
+{Stokes} problems
+  with {C++} metaprogramming.
+\newblock J. of Computational Science \textbf{49}, 101285 (2021).
+\newblock \doi{10.1016/j.jocs.2020.101285}.
+\newblock
+  \urlprefix\url{https://www.sciencedirect.com/science/article/pii/S1877750320305809}.
+
+\bibitem{Demidov2012}
+D.~Demidov and  D.~Shevchenko, Modification of algebraic multigrid
+for effective
+  gpgpu-based solution of nonstationary hydrodynamics problems.
+\newblock J. of Computational Science \textbf{3}(6), 460--462 (2012).
+
+\bibitem{Larese2008}
+A.~Larese, R.~Rossi, E.~O{\~n}ate, and S.~Idelsohn, Validation of
+the particle
+  finite element method ({PFEM}) for simulation of free surface flows.
+\newblock Engineering Computations \textbf{25}(4), 385--425 (2008).
+
+\bibitem{ruge1987algebraic}
+J. W. Ruge and  K.~St{\"u}ben, Algebraic multigrid.
+\newblock In: Multigrid methods, pp. 73--130. SIAM (1987).
+
+\bibitem{Stuben1999}
+K.~Stuben, {Algebraic multigrid (AMG): an introduction with applications}.
+\newblock GMD Report~70, GMD, Sankt Augustin, Germany (1999).
+
+\bibitem{Trottenberg2001}
+U.~Trottenberg, C.~Oosterlee, and A.~Sch{\"{u}}ller, {Multigrid}.
+\newblock Academic Press, London,  2001.
+
+\bibitem{dambreak}
+S.~von Wenczowski, Two-fluids dam break scenario.
+\newblock
+  \urlprefix\url{https://github.com/KratosMultiphysics/Examples/tree/master/fluid_dynamics/validation/two_fluid_dam_break}.
+\newblock Accessed 15.05.2021.
+
+\end{thebibliography}
+
 
 \end{document}

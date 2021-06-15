@@ -6,7 +6,7 @@ if (LATEX_FOUND)
     include(UseLATEX.cmake)
     add_latex_document(
         amgcl_reuse.tex
-        BIBFILES ref.bib
+        #BIBFILES ref.bib
         DEPENDS ljm.sty spmpsci.bst
         )
 endif()
